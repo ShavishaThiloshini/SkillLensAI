@@ -1,0 +1,182 @@
+/* ==========================================================================
+   Navbar — CSS Module
+   ========================================================================== */
+
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  height: var(--navbar-height);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  box-shadow: var(--shadow-xs);
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  padding-inline: var(--space-4);
+  gap: var(--space-4);
+}
+
+/* ── Left ── */
+.left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.menuBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.menuBtn:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text-primary);
+}
+
+.menuBtn:focus-visible {
+  outline: 2px solid var(--color-indigo);
+  outline-offset: 2px;
+}
+
+/* ── Brand ── */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-decoration: none;
+  color: var(--color-text-primary);
+  flex-shrink: 0;
+}
+
+.brand:hover {
+  text-decoration: none;
+  color: var(--color-text-primary);
+}
+
+.brandIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  background: linear-gradient(135deg, var(--color-indigo) 0%, var(--color-cyan) 100%);
+  border-radius: var(--radius-md);
+  color: var(--color-white);
+  flex-shrink: 0;
+}
+
+.brandName {
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-navy);
+}
+
+.brandAi {
+  color: var(--color-indigo);
+}
+
+/* ── Right actions ── */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.iconBtn:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text-primary);
+}
+
+.iconBtn:focus-visible {
+  outline: 2px solid var(--color-indigo);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+.badge {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: var(--radius-full);
+  background: var(--color-red);
+  color: var(--color-white);
+  font-size: 0.625rem;
+  font-weight: var(--font-bold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--color-surface);
+}
+
+/* ── Avatar ── */
+.avatarBtn {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-border);
+  cursor: pointer;
+  overflow: hidden;
+  background: var(--color-indigo-50);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.avatarBtn:hover {
+  border-color: var(--color-indigo);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+}
+
+.avatarBtn:focus-visible {
+  outline: 2px solid var(--color-indigo);
+  outline-offset: 2px;
+}
+
+.avatarInner {
+  color: var(--color-indigo);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

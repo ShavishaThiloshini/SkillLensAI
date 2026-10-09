@@ -1,0 +1,379 @@
+/* ==========================================================================
+   Showcase — CSS Module
+   ========================================================================== */
+
+.showcase {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding-bottom: var(--space-16);
+}
+
+/* ── Page header ── */
+.pageHeader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-bottom: var(--space-8);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.pageHeaderBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--color-indigo);
+  background: var(--color-indigo-50);
+  border: 1px solid var(--color-indigo-100);
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-3);
+  width: fit-content;
+}
+
+.pageTitle {
+  font-size: var(--text-4xl);
+  font-weight: var(--font-extrabold);
+  color: var(--color-text-primary);
+  letter-spacing: -0.03em;
+  margin: 0;
+}
+
+.pageSubtitle {
+  font-size: var(--text-lg);
+  color: var(--color-text-secondary);
+  max-width: 56ch;
+  line-height: var(--leading-relaxed);
+}
+
+/* ── Section ── */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.sectionHeader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.sectionTitle {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  color: var(--color-text-primary);
+  margin: 0;
+  letter-spacing: -0.01em;
+  position: relative;
+  padding-left: var(--space-4);
+}
+
+.sectionTitle::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.2em;
+  bottom: 0.2em;
+  width: 3px;
+  background: linear-gradient(to bottom, var(--color-indigo), var(--color-cyan));
+  border-radius: var(--radius-full);
+}
+
+.sectionSubtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: 0;
+  padding-left: var(--space-4);
+}
+
+.sectionBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* ── Color palette ── */
+.palette {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-3);
+}
+
+.colorCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+
+.colorSwatch {
+  height: 64px;
+}
+
+.colorMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+}
+
+.colorName {
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+}
+
+.colorHex {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+/* ── Typography ── */
+.typeGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
+
+.typeRow {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.typeRow:last-child { border-bottom: none; }
+
+.typeLabel {
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-muted);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.typeSample {
+  margin: 0;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+@media (max-width: 640px) {
+  .typeRow {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+}
+
+/* ── Buttons ── */
+.buttonGrid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
+
+.buttonRow {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.buttonRow:last-child { border-bottom: none; }
+
+.rowLabel {
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-muted);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.rowItems {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .buttonRow {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+}
+
+/* ── Cards ── */
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-5);
+}
+
+.scoreDemo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) 0;
+}
+
+.scoreBig {
+  font-size: var(--text-5xl);
+  font-weight: var(--font-extrabold);
+  color: var(--color-indigo);
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.scoreLabel {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-emerald);
+  background: var(--color-emerald-50);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+}
+
+.statGrid {
+  display: flex;
+  gap: var(--space-6);
+  justify-content: space-around;
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.statValue {
+  font-size: var(--text-3xl);
+  font-weight: var(--font-extrabold);
+  line-height: 1;
+}
+
+.statLabel {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-weight: var(--font-medium);
+  text-align: center;
+}
+
+/* ── Form grid ── */
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-5);
+}
+
+/* ── Modal steps ── */
+.modalStep {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.stepNum {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-full);
+  background: var(--color-indigo-50);
+  color: var(--color-indigo);
+  font-size: var(--text-sm);
+  font-weight: var(--font-bold);
+  flex-shrink: 0;
+}
+
+.modalStep strong {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.modalStep p {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: var(--leading-relaxed);
+}
+
+/* ── Spinners ── */
+.spinnerGrid {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-8);
+  flex-wrap: wrap;
+}
+
+.spinnerColors {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+}
+
+.spinnerItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.spinnerLabel {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+/* ── Status grid ── */
+.statusGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+
+.statusItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid;
+}
+
+.statusLabel {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+}
+
+.statusDesc {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}

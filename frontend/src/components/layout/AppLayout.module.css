@@ -1,0 +1,41 @@
+/* ==========================================================================
+   AppLayout — CSS Module
+   ========================================================================== */
+
+.layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  overflow-x: hidden;
+
+  /* On desktop, push right of sidebar */
+  @media (min-width: 1024px) {
+    margin-left: var(--sidebar-width);
+  }
+}
+
+.content {
+  padding: var(--space-8) var(--container-padding);
+  max-width: var(--content-max-width);
+  margin-inline: auto;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .content {
+    padding: var(--space-6) var(--space-4);
+  }
+}
