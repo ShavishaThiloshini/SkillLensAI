@@ -63,6 +63,29 @@
   box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
 }
 
+/* ── Input wrapper for adornments/actions ── */
+.inputWrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.input--withRightAction {
+  padding-right: 2.75rem;
+}
+
+.rightActionContainer {
+  position: absolute;
+  right: var(--space-2);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
 /* ── Error state ── */
 .input--error,
 .textarea--error,

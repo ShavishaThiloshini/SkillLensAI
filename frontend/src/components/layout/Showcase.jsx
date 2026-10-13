@@ -9,7 +9,7 @@ import Input from '../common/Input'
 import Textarea from '../common/Textarea'
 import Select from '../common/Select'
 import Modal from '../common/Modal'
-import Spinner, { PageLoader } from '../common/Spinner'
+import Spinner from '../common/Spinner'
 import styles from './Showcase.module.css'
 
 const SKILL_OPTIONS = [
@@ -40,16 +40,6 @@ function Section({ title, subtitle, children }) {
       </div>
       <div className={styles.sectionBody}>{children}</div>
     </section>
-  )
-}
-
-function Badge({ color, label }) {
-  return (
-    <div className={styles.badge} style={{ background: color }}>
-      <span className={styles.badgeSwatch} />
-      <span className={styles.badgeName}>{label}</span>
-      <code className={styles.badgeHex}>{color}</code>
-    </div>
   )
 }
 

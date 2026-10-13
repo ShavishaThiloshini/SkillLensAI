@@ -12,3 +12,6 @@ backend/uploads/*
 *.log
 
 .DS_Store
+
+backend/ca.pem
+backend/.env

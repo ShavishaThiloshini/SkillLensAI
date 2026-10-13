@@ -15,6 +15,7 @@ function Input({
   disabled = false,
   className = '',
   containerClassName = '',
+  rightAction,
   ...rest
 }) {
   const autoId = useId()
@@ -33,26 +34,34 @@ function Input({
           )}
         </label>
       )}
-      <input
-        id={id}
-        type={type}
-        placeholder={placeholder}
-        disabled={disabled}
-        required={required}
-        aria-invalid={hasError}
-        aria-describedby={
-          hasError ? `${id}-error` : helperText ? `${id}-helper` : undefined
-        }
-        className={[
-          styles.input,
-          hasError ? styles['input--error'] : '',
-          disabled ? styles['input--disabled'] : '',
-          className,
-        ]
-          .filter(Boolean)
-          .join(' ')}
-        {...rest}
-      />
+      <div className={styles.inputWrapper}>
+        <input
+          id={id}
+          type={type}
+          placeholder={placeholder}
+          disabled={disabled}
+          required={required}
+          aria-invalid={hasError}
+          aria-describedby={
+            hasError ? `${id}-error` : helperText ? `${id}-helper` : undefined
+          }
+          className={[
+            styles.input,
+            hasError ? styles['input--error'] : '',
+            disabled ? styles['input--disabled'] : '',
+            rightAction ? styles['input--withRightAction'] : '',
+            className,
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          {...rest}
+        />
+        {rightAction && (
+          <div className={styles.rightActionContainer}>
+            {rightAction}
+          </div>
+        )}
+      </div>
       {hasError && (
         <span id={`${id}-error`} className={styles.errorText} role="alert">
           {errorText}

@@ -1,25 +1,37 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import AppLayout from './components/layout/AppLayout'
 import UIShowcase from './components/layout/Showcase'
+import Login from './pages/Login'
+import Register from './pages/Register'
+import { ProtectedRoute, PublicOnlyRoute } from './components/common/ProtectedRoute'
+import { useAuth } from './context/useAuth'
 
 /**
  * SkillLens AI — App Router
  *
- * Day 07: UI Foundation only.
- * Authentication, dashboard and feature pages will be added in future days.
- *
- * Current routes:
- *  /           → redirects to /showcase (temporary)
+ * Day 08: Authentication UI & State Management.
+ * Routes:
+ *  /           → dynamic redirect (/dashboard if authenticated, else /login)
+ *  /login      → public only (redirects to /dashboard if logged in)
+ *  /register   → public only (redirects to /dashboard if logged in)
  *  /showcase   → UI component showcase (development only)
- *  /dashboard  → placeholder via AppLayout
- *  /resumes    → placeholder via AppLayout
- *  /jobs       → placeholder via AppLayout
- *  /history    → placeholder via AppLayout
- *  /roadmap    → placeholder via AppLayout
- *  /profile    → placeholder via AppLayout
- *  /settings   → placeholder via AppLayout
+ *  /dashboard  → protected via ProtectedRoute + AppLayout
+ *  /resumes    → protected via ProtectedRoute + AppLayout
+ *  /jobs       → protected via ProtectedRoute + AppLayout
+ *  /history    → protected via ProtectedRoute + AppLayout
+ *  /roadmap    → protected via ProtectedRoute + AppLayout
+ *  /profile    → protected via ProtectedRoute + AppLayout
+ *  /settings   → protected via ProtectedRoute + AppLayout
  */
+function RootRedirect() {
+  const { isAuthenticated, loading } = useAuth()
+  if (loading) return null
+  return <Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />
+}
+
 function PlaceholderPage({ title }) {
+  const { user } = useAuth()
+
   return (
     <div style={{
       display: 'flex',
@@ -32,6 +44,11 @@ function PlaceholderPage({ title }) {
       textAlign: 'center',
     }}>
       <h2 style={{ color: 'var(--color-text-primary)', margin: 0 }}>{title}</h2>
+      {user && (
+        <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-indigo)' }}>
+          Welcome back, {user.full_name}!
+        </p>
+      )}
       <p style={{ margin: 0, fontSize: 'var(--text-sm)' }}>
         This page will be implemented in a future development day.
       </p>
@@ -42,10 +59,28 @@ function PlaceholderPage({ title }) {
 function App() {
   return (
     <Routes>
-      {/* Temporary root redirect to showcase */}
-      <Route path="/" element={<Navigate to="/showcase" replace />} />
+      {/* Root redirect */}
+      <Route path="/" element={<RootRedirect />} />
 
-      {/* UI Showcase — wrapped in AppLayout to demo nav components */}
+      {/* Guest-only Authentication routes */}
+      <Route
+        path="/login"
+        element={
+          <PublicOnlyRoute>
+            <Login />
+          </PublicOnlyRoute>
+        }
+      />
+      <Route
+        path="/register"
+        element={
+          <PublicOnlyRoute>
+            <Register />
+          </PublicOnlyRoute>
+        }
+      />
+
+      {/* UI Showcase — public preview wrapped in AppLayout */}
       <Route
         path="/showcase"
         element={
@@ -55,17 +90,80 @@ function App() {
         }
       />
 
-      {/* Future application pages — placeholder until implemented */}
-      <Route path="/dashboard" element={<AppLayout><PlaceholderPage title="Dashboard" /></AppLayout>} />
-      <Route path="/resumes"   element={<AppLayout><PlaceholderPage title="My Resumes" /></AppLayout>} />
-      <Route path="/jobs"      element={<AppLayout><PlaceholderPage title="Job Descriptions" /></AppLayout>} />
-      <Route path="/history"   element={<AppLayout><PlaceholderPage title="Analysis History" /></AppLayout>} />
-      <Route path="/roadmap"   element={<AppLayout><PlaceholderPage title="Learning Roadmap" /></AppLayout>} />
-      <Route path="/profile"   element={<AppLayout><PlaceholderPage title="Profile" /></AppLayout>} />
-      <Route path="/settings"  element={<AppLayout><PlaceholderPage title="Settings" /></AppLayout>} />
+      {/* Protected application pages */}
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <PlaceholderPage title="Dashboard" />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/resumes"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <PlaceholderPage title="My Resumes" />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/jobs"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <PlaceholderPage title="Job Descriptions" />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/history"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <PlaceholderPage title="Analysis History" />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/roadmap"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <PlaceholderPage title="Learning Roadmap" />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <PlaceholderPage title="Profile" />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <PlaceholderPage title="Settings" />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
 
       {/* Catch-all */}
-      <Route path="*" element={<Navigate to="/showcase" replace />} />
+      <Route path="*" element={<RootRedirect />} />
     </Routes>
   )
 }
