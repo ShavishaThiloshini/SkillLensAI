@@ -83,4 +83,5 @@ Card.Footer = CardFooter
 Card.Title = CardTitle
 Card.Description = CardDescription
 
+export { CardHeader, CardBody, CardFooter, CardTitle, CardDescription }
 export default Card

@@ -8,11 +8,34 @@ const { initDb } = require("./database/initDb");
 
 const app = express();
 
-app.use(cors());
+// Explicit CORS: allow the Vite dev server (and any production URL in FRONTEND_URL)
+const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow server-to-server requests (no origin header) and listed origins
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin '${origin}' not allowed`));
+      }
+    },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 // Routes
+const resumeRoutes = require("./routes/resumeRoutes");
+
 app.use("/api/auth", authRoutes);
+app.use("/api/resumes", resumeRoutes);
 
 app.get("/api/health", async (req, res) => {
   try {

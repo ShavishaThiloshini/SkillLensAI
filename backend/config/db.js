@@ -17,6 +17,17 @@ const pool = mysql.createPool({
     rejectUnauthorized: true,
   },
 
+  // Keep-alive: prevents Aiven from silently closing idle connections
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000, // 10 s
+
+  // Discard connections that have been idle too long
+  // (Aiven default timeout is ~3600 s; we recycle at 1800 s)
+  idleTimeout: 1800000, // 30 min
+
+  // Connection attempt timeout
+  connectTimeout: 20000, // 20 s
+
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,

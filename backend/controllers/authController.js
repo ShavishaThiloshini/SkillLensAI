@@ -2,7 +2,11 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const db = require("../config/db");
 
-const JWT_SECRET = process.env.JWT_SECRET || "skilllens_ai_jwt_secret_key_development_2026";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error("[Auth] FATAL: JWT_SECRET is not set in environment. Refusing to start.");
+  process.exit(1);
+}
 const JWT_EXPIRES_IN = "7d";
 
 // Standard email validation regular expression
@@ -96,9 +100,9 @@ async function register(req, res) {
 
     const userId = result.insertId;
 
-    // 7. Generate JWT
+    // 7. Generate JWT — payload contains only non-sensitive identity fields
     const token = jwt.sign(
-      { id: userId, email: trimmedEmail, full_name: trimmedName },
+      { id: userId, email: trimmedEmail },
       JWT_SECRET,
       { expiresIn: JWT_EXPIRES_IN }
     );
@@ -174,9 +178,9 @@ async function login(req, res) {
       });
     }
 
-    // 5. Generate JWT
+    // 5. Generate JWT — payload contains only non-sensitive identity fields
     const token = jwt.sign(
-      { id: user.id, email: user.email, full_name: user.full_name },
+      { id: user.id, email: user.email },
       JWT_SECRET,
       { expiresIn: JWT_EXPIRES_IN }
     );

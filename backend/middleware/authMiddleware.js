@@ -1,6 +1,10 @@
 const jwt = require("jsonwebtoken");
 
-const JWT_SECRET = process.env.JWT_SECRET || "skilllens_ai_jwt_secret_key_development_2026";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error("[AuthMiddleware] FATAL: JWT_SECRET is not set in environment. Refusing to start.");
+  process.exit(1);
+}
 
 /**
  * SkillLens AI — Authentication Middleware
