@@ -42,7 +42,7 @@ export async function getResumes() {
 }
 
 /**
- * Retrieves metadata for a specific resume owned by the current authenticated user.
+ * Retrieves metadata and extracted structured information for a specific resume.
  *
  * @param {number|string} id - Resume ID
  * @returns {Promise<{ success: boolean, resume: Object }>}
@@ -52,8 +52,21 @@ export async function getResumeById(id) {
   return response.data
 }
 
+/**
+ * Triggers backend text extraction and section parsing for a stored resume.
+ *
+ * @param {number|string} id - Resume ID
+ * @returns {Promise<{ success: boolean, resumeId: number, processing_status: string, message: string, structuredData?: Object }>}
+ */
+export async function extractResume(id) {
+  const response = await api.post(`/resumes/${id}/extract`)
+  return response.data
+}
+
 export default {
   uploadResume,
   getResumes,
   getResumeById,
+  extractResume,
 }
+

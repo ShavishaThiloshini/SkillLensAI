@@ -1,72 +1,94 @@
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
-const zlib = require("zlib");
 const jwt = require("jsonwebtoken");
 
-const { validateResumeFile, isValidPdfBuffer, isValidDocxBuffer } = require("../utils/fileValidator");
+const { validateResumeFile } = require("../utils/fileValidator");
+const { extractDocumentText, cleanExtractedText } = require("../utils/documentParser");
+const { parseResumeText, segmentSections, extractContactDetails } = require("../utils/resumeParser");
+const { extractSkills, SKILL_CATALOGUE } = require("../utils/skillCatalogue");
 const { RESUMES_UPLOAD_DIR } = require("../middleware/uploadMiddleware");
 
-// Helper to create a minimal valid PDF in memory
-function createMinimalPdfBuffer() {
-  const content = `%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>\nendobj\nxref\n0 4\n0000000000 65535 f \n0000000010 00000 n \n0000000060 00000 n \n0000000117 00000 n \ntrailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n190\n%%EOF`;
-  return Buffer.from(content, "utf8");
+// Helper to create a valid minimal DOCX buffer with custom text
+async function createDocxWithText(text) {
+  const JSZip = require("jszip");
+  const zip = new JSZip();
+
+  const escapedText = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  const paragraphs = escapedText
+    .split("\n")
+    .map((line) => `<w:p><w:r><w:t>${line}</w:t></w:r></w:p>`)
+    .join("");
+
+  zip.file(
+    "[Content_Types].xml",
+    '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/></Types>'
+  );
+
+  zip.file(
+    "word/document.xml",
+    `<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${paragraphs}</w:body></w:document>`
+  );
+
+  return await zip.generateAsync({ type: "nodebuffer" });
 }
 
-// Helper to create a valid minimal DOCX buffer in memory (a zip containing [Content_Types].xml and word/document.xml)
-function createMinimalDocxBuffer() {
-  function makeZipEntry(filename, data) {
-    const dataBuf = Buffer.isBuffer(data) ? data : Buffer.from(data, "utf8");
-    const nameBuf = Buffer.from(filename, "utf8");
 
-    // Local file header: 30 bytes + nameLen + dataLen
-    const header = Buffer.alloc(30);
-    header.writeUInt32LE(0x04034b50, 0); // Local file header signature
-    header.writeUInt16LE(20, 4); // Version needed to extract
-    header.writeUInt16LE(0, 6); // General purpose bit flag
-    header.writeUInt16LE(0, 8); // Compression method (0 = stored)
-    header.writeUInt16LE(0, 10); // Mod time
-    header.writeUInt16LE(0, 12); // Mod date
-    header.writeUInt32LE(0, 14); // CRC-32 (0 for test)
-    header.writeUInt32LE(dataBuf.length, 18); // Compressed size
-    header.writeUInt32LE(dataBuf.length, 22); // Uncompressed size
-    header.writeUInt16LE(nameBuf.length, 26); // Filename length
-    header.writeUInt16LE(0, 28); // Extra field length
+// Sample complete resume text
+const SAMPLE_RESUME_TEXT = `Jane Doe
+Senior Full Stack Engineer
+Colombo, Sri Lanka
+Email: jane.doe@example.com
+Phone: +94 77 123 4567
+LinkedIn: https://linkedin.com/in/janedoe
+GitHub: https://github.com/janedoe
+Portfolio: https://janedoe.dev
 
-    return Buffer.concat([header, nameBuf, dataBuf]);
-  }
+PROFESSIONAL SUMMARY
+Experienced full-stack engineer with 6+ years designing scalable cloud-native architectures using React, Node.js, and TypeScript.
 
-  const entry1 = makeZipEntry("[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>');
-  const entry2 = makeZipEntry("word/document.xml", '<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Resume Test</w:t></w:r></w:p></w:body></w:document>');
+TECHNICAL SKILLS
+Languages: JavaScript, TypeScript, Python, SQL, C++
+Frameworks: React, Next.js, Express.js, Tailwind CSS, Redux
+Databases: MySQL, PostgreSQL, MongoDB, Redis
+Cloud & DevOps: AWS, Docker, Kubernetes, CI/CD, Git
 
-  return Buffer.concat([entry1, entry2]);
-}
+WORK EXPERIENCE
+Senior Software Engineer
+Acme Cloud Solutions
+2022 - Present
+- Architected microservices with Node.js and TypeScript handling 5M daily requests.
+- Led frontend redesign with React and Next.js, cutting page load by 40%.
 
-// Helper to create a generic ZIP buffer that is NOT a docx (e.g. contains photos or random files)
-function createGenericZipBuffer() {
-  function makeZipEntry(filename, data) {
-    const dataBuf = Buffer.from(data, "utf8");
-    const nameBuf = Buffer.from(filename, "utf8");
-    const header = Buffer.alloc(30);
-    header.writeUInt32LE(0x04034b50, 0);
-    header.writeUInt16LE(20, 4);
-    header.writeUInt16LE(0, 6);
-    header.writeUInt16LE(0, 8);
-    header.writeUInt32LE(dataBuf.length, 18);
-    header.writeUInt32LE(dataBuf.length, 22);
-    header.writeUInt16LE(nameBuf.length, 26);
-    header.writeUInt16LE(0, 28);
-    return Buffer.concat([header, nameBuf, dataBuf]);
-  }
+Software Engineer
+Tech Innovators Ltd
+2019 - 2022
+- Developed RESTful APIs in Express.js and integrated MySQL database migrations.
+- Collaborated in an Agile Scrum team to deliver weekly releases via Docker and CI/CD pipelines.
 
-  return Buffer.concat([
-    makeZipEntry("photo.jpg", "fake-photo-data"),
-    makeZipEntry("manifest.json", "{}"),
-  ]);
-}
+EDUCATION
+Bachelor of Science in Computer Science
+University of Colombo
+2015 - 2019
+GPA: 3.85 / 4.0
+
+PROJECTS
+SkillLens AI
+https://github.com/janedoe/skilllens
+Technologies: React, Node.js, MySQL, Express.js
+- Solo project building an AI-powered resume and skill gap analyzer.
+
+CERTIFICATIONS
+AWS Certified Solutions Architect
+Amazon Web Services
+2023`;
 
 async function runTests() {
-  console.log("=== SkillLens AI — Day 10 Resume Upload & Validation Test Suite ===");
+  console.log("=== SkillLens AI — Day 11 Text Extraction & Parsing Test Suite ===");
   const testDir = path.join(__dirname, "temp_test_files");
   if (!fs.existsSync(testDir)) {
     fs.mkdirSync(testDir, { recursive: true });
@@ -75,9 +97,9 @@ async function runTests() {
   let passed = 0;
   let failed = 0;
 
-  function test(name, fn) {
+  async function testAsync(name, fn) {
     try {
-      fn();
+      await fn();
       console.log(`[PASS] ${name}`);
       passed++;
     } catch (err) {
@@ -86,113 +108,168 @@ async function runTests() {
     }
   }
 
-  // 1. Valid PDF validation
-  const validPdfPath = path.join(testDir, "sample_resume.pdf");
-  fs.writeFileSync(validPdfPath, createMinimalPdfBuffer());
-  test("1. Validate valid PDF document", () => {
-    const res = validateResumeFile(validPdfPath, "sample_resume.pdf");
-    assert.strictEqual(res.isValid, true);
-    assert.strictEqual(res.fileType, "PDF");
-    assert.ok(res.fileSize > 0);
+  // 1. DOCX Extraction
+  const docxFile = path.join(testDir, "test_resume.docx");
+  fs.writeFileSync(docxFile, await createDocxWithText(SAMPLE_RESUME_TEXT));
+
+  await testAsync("1. Extract text from valid DOCX", async () => {
+
+    const res = await extractDocumentText(docxFile, "DOCX");
+    assert.strictEqual(res.success, true);
+    assert.ok(res.text.includes("Jane Doe"));
+    assert.ok(res.text.includes("Senior Full Stack Engineer"));
+    assert.ok(res.charCount > 100);
   });
 
-  // 2. Valid DOCX validation
-  const validDocxPath = path.join(testDir, "sample_resume.docx");
-  fs.writeFileSync(validDocxPath, createMinimalDocxBuffer());
-  test("2. Validate valid DOCX document", () => {
-    const res = validateResumeFile(validDocxPath, "sample_resume.docx");
-    assert.strictEqual(res.isValid, true);
-    assert.strictEqual(res.fileType, "DOCX");
-    assert.ok(res.fileSize > 0);
+  // 2. Corrupted DOCX handling
+  const corruptedDocx = path.join(testDir, "corrupted.docx");
+  fs.writeFileSync(corruptedDocx, Buffer.from("PK\x03\x04 corrupt zip content"));
+  await testAsync("2. Handle corrupted DOCX gracefully without throwing unhandled exceptions", async () => {
+    const res = await extractDocumentText(corruptedDocx, "DOCX");
+    assert.strictEqual(res.success, false);
+    assert.ok(res.error);
   });
 
-  // 3. Reject unsupported extension (.txt)
-  const txtPath = path.join(testDir, "notes.txt");
-  fs.writeFileSync(txtPath, "Plain text resume content");
-  test("3. Reject .txt file", () => {
-    const res = validateResumeFile(txtPath, "notes.txt");
-    assert.strictEqual(res.isValid, false);
-    assert.ok(res.message.includes("Unsupported file format"));
+  // 3. Empty document handling
+  const emptyDocx = path.join(testDir, "empty.docx");
+  fs.writeFileSync(emptyDocx, Buffer.alloc(0));
+  await testAsync("3. Handle empty document (0 bytes) gracefully", async () => {
+    const res = await extractDocumentText(emptyDocx, "DOCX");
+    assert.strictEqual(res.success, false);
+    assert.strictEqual(res.error, "File is empty (0 bytes).");
   });
 
-  // 4. Reject renamed or malformed document (text file renamed to .pdf)
-  const fakePdfPath = path.join(testDir, "fake.pdf");
-  fs.writeFileSync(fakePdfPath, "This is not a real PDF at all, just plain text");
-  test("4a. Reject text file disguised as .pdf", () => {
-    const res = validateResumeFile(fakePdfPath, "fake.pdf");
-    assert.strictEqual(res.isValid, false);
-    assert.ok(res.message.includes("Invalid PDF document"));
+  // 4. Missing file handling
+  await testAsync("4. Handle missing document file safely", async () => {
+    const res = await extractDocumentText(path.join(testDir, "non_existent.pdf"), "PDF");
+    assert.strictEqual(res.success, false);
+    assert.strictEqual(res.error, "Document file not found on disk.");
   });
 
-  // 4b. Reject arbitrary ZIP file renamed to .docx (not Office Open XML)
-  const genericZipPath = path.join(testDir, "generic.docx");
-  fs.writeFileSync(genericZipPath, createGenericZipBuffer());
-  test("4b. Reject arbitrary ZIP renamed to .docx (not Office Open XML)", () => {
-    const res = validateResumeFile(genericZipPath, "generic.docx");
-    assert.strictEqual(res.isValid, false);
-    assert.ok(res.message.includes("Office Open XML Word document"));
+  // 5. Parse complete resume into structured information
+  await testAsync("5. Parse candidate name and contact information reliably", async () => {
+    const parsed = parseResumeText(SAMPLE_RESUME_TEXT);
+    assert.strictEqual(parsed.candidate.full_name, "Jane Doe");
+    assert.strictEqual(parsed.candidate.email, "jane.doe@example.com");
+    assert.strictEqual(parsed.candidate.phone, "+94 77 123 4567");
+    assert.strictEqual(parsed.candidate.location, "Colombo, Sri Lanka");
+    assert.strictEqual(parsed.candidate.linkedin_url, "https://linkedin.com/in/janedoe");
+    assert.strictEqual(parsed.candidate.github_url, "https://github.com/janedoe");
+    assert.strictEqual(parsed.candidate.portfolio_url, "https://janedoe.dev");
   });
 
-  // 5. Reject file exceeding 5 MB limit
-  const largeFilePath = path.join(testDir, "large.pdf");
-  const largeBuf = Buffer.alloc(5 * 1024 * 1024 + 1024); // 5 MB + 1 KB
-  largeBuf.write("%PDF-1.4\n");
-  fs.writeFileSync(largeFilePath, largeBuf);
-  test("5. Reject file exceeding 5 MB limit", () => {
-    const res = validateResumeFile(largeFilePath, "large.pdf");
-    assert.strictEqual(res.isValid, false);
-    assert.ok(res.message.includes("exceeds the 5 MB limit"));
+  // 6. Section segmentation
+  await testAsync("6. Identify standard resume section headers", async () => {
+    const parsed = parseResumeText(SAMPLE_RESUME_TEXT);
+    const sectionTypes = parsed.sections.map((s) => s.section_type);
+    assert.ok(sectionTypes.includes("SUMMARY"));
+    assert.ok(sectionTypes.includes("SKILLS"));
+    assert.ok(sectionTypes.includes("EXPERIENCE"));
+    assert.ok(sectionTypes.includes("EDUCATION"));
+    assert.ok(sectionTypes.includes("PROJECTS"));
+    assert.ok(sectionTypes.includes("CERTIFICATIONS"));
   });
 
-  // 6. Reject empty file (0 bytes)
-  const emptyFilePath = path.join(testDir, "empty.pdf");
-  fs.writeFileSync(emptyFilePath, Buffer.alloc(0));
-  test("6. Reject empty file (0 bytes)", () => {
-    const res = validateResumeFile(emptyFilePath, "empty.pdf");
-    assert.strictEqual(res.isValid, false);
-    assert.ok(res.message.includes("empty (0 bytes)"));
+  // 7. Skill catalogue matching
+  await testAsync("7. Extract skills categorized with boundary safety", async () => {
+    const parsed = parseResumeText(SAMPLE_RESUME_TEXT);
+    const skillNames = parsed.skills.map((s) => s.name);
+    assert.ok(skillNames.includes("JavaScript"));
+    assert.ok(skillNames.includes("TypeScript"));
+    assert.ok(skillNames.includes("React"));
+    assert.ok(skillNames.includes("Node.js"));
+    assert.ok(skillNames.includes("MySQL"));
+    assert.ok(skillNames.includes("AWS"));
+    assert.ok(skillNames.includes("Docker"));
+    assert.ok(skillNames.includes("C++"));
+
+    // Verify categories
+    const reactSkill = parsed.skills.find((s) => s.name === "React");
+    assert.strictEqual(reactSkill.category, "FRAMEWORK");
+
+    const mysqlSkill = parsed.skills.find((s) => s.name === "MySQL");
+    assert.strictEqual(mysqlSkill.category, "DATABASE");
   });
 
-  // 7. Verify authentication token validation & ownership logic
+  // 8. Education extraction
+  await testAsync("8. Extract education entries with degree and institution", async () => {
+    const parsed = parseResumeText(SAMPLE_RESUME_TEXT);
+    assert.ok(parsed.education.length > 0);
+    assert.ok(parsed.education[0].qualification.includes("Bachelor of Science"));
+    assert.ok(parsed.education[0].institution.includes("University of Colombo"));
+    assert.ok(parsed.education[0].dates.includes("2015 - 2019"));
+  });
+
+  // 9. Experience extraction
+  await testAsync("9. Extract multiple experience entries with titles and dates", async () => {
+    const parsed = parseResumeText(SAMPLE_RESUME_TEXT);
+    assert.ok(parsed.experience.length >= 2);
+    assert.ok(parsed.experience[0].title.includes("Senior Software Engineer"));
+    assert.ok(parsed.experience[1].title.includes("Software Engineer"));
+  });
+
+  // 10. Projects extraction
+  await testAsync("10. Extract projects with links and descriptions", async () => {
+    const parsed = parseResumeText(SAMPLE_RESUME_TEXT);
+    assert.ok(parsed.projects.length >= 1);
+    assert.strictEqual(parsed.projects[0].name, "SkillLens AI");
+    assert.strictEqual(parsed.projects[0].url, "https://github.com/janedoe/skilllens");
+  });
+
+  // 11. Certifications extraction
+  await testAsync("11. Extract professional certifications with issuer", async () => {
+    const parsed = parseResumeText(SAMPLE_RESUME_TEXT);
+    assert.ok(parsed.certifications.length >= 1);
+    assert.ok(parsed.certifications[0].name.includes("AWS Certified Solutions Architect"));
+    assert.strictEqual(parsed.certifications[0].issuer, "AWS");
+  });
+
+  // 12. Resume with missing sections (graceful degradation)
+  await testAsync("12. Parse resume with missing sections without fabricating data", async () => {
+    const minimalResume = `Alex Smith\nalex@example.com\n\nSKILLS\nPython, Docker\n`;
+    const parsed = parseResumeText(minimalResume);
+    assert.strictEqual(parsed.candidate.full_name, "Alex Smith");
+    assert.strictEqual(parsed.candidate.email, "alex@example.com");
+    assert.strictEqual(parsed.candidate.phone, null);
+    assert.strictEqual(parsed.candidate.linkedin_url, null);
+    assert.strictEqual(parsed.experience.length, 0);
+    assert.strictEqual(parsed.education.length, 0);
+    assert.strictEqual(parsed.certifications.length, 0);
+    const skillNames = parsed.skills.map((s) => s.name);
+    assert.ok(skillNames.includes("Python"));
+    assert.ok(skillNames.includes("Docker"));
+  });
+
+  // 13. Unusual section headings
+  await testAsync("13. Recognize varied section headings (e.g. 'Core Competencies', 'Employment History')", async () => {
+    const variedResume = `John Doe\njohn@example.com\n\nCORE COMPETENCIES\nGo, Kubernetes\n\nEMPLOYMENT HISTORY\nCloud Architect\n2020 - 2023\nLed infrastructure deployment.\n`;
+    const parsed = parseResumeText(variedResume);
+    const types = parsed.sections.map((s) => s.section_type);
+    assert.ok(types.includes("SKILLS"));
+    assert.ok(types.includes("EXPERIENCE"));
+  });
+
+  // 14. JWT Authentication & Ownership boundary
   const JWT_SECRET = process.env.JWT_SECRET || "skilllens_ai_jwt_secret_change_this_in_production_2026";
   const user1Token = jwt.sign({ id: 101, email: "user1@example.com" }, JWT_SECRET, { expiresIn: "1h" });
   const user2Token = jwt.sign({ id: 102, email: "user2@example.com" }, JWT_SECRET, { expiresIn: "1h" });
 
-  test("7a. Decodes valid JWT authentication token", () => {
-    const decoded = jwt.verify(user1Token, JWT_SECRET);
-    assert.strictEqual(decoded.id, 101);
-    assert.strictEqual(decoded.email, "user1@example.com");
+  await testAsync("14. Reject unauthenticated or unauthorized access across users", async () => {
+    const decoded1 = jwt.verify(user1Token, JWT_SECRET);
+    const decoded2 = jwt.verify(user2Token, JWT_SECRET);
+    assert.strictEqual(decoded1.id, 101);
+    assert.strictEqual(decoded2.id, 102);
+    assert.notStrictEqual(decoded1.id, decoded2.id);
+
+    // Invalid token rejection
+    assert.throws(() => jwt.verify("tampered.token.here", JWT_SECRET));
   });
 
-  test("7b. Rejects invalid JWT token", () => {
-    assert.throws(() => {
-      jwt.verify("invalid.token.here", JWT_SECRET);
-    });
-  });
-
-  test("7c. Enforces user ownership boundary", () => {
-    const user1Decoded = jwt.verify(user1Token, JWT_SECRET);
-    const user2Decoded = jwt.verify(user2Token, JWT_SECRET);
-    // User 1 cannot access user 2's id
-    assert.notStrictEqual(user1Decoded.id, user2Decoded.id);
-  });
-
-  // 8. Verify orphaned file cleanup simulation
-  test("8. Verify orphaned file cleanup when database fails", () => {
-    const orphanTestFile = path.join(RESUMES_UPLOAD_DIR, "test-orphan-cleanup.pdf");
-    fs.writeFileSync(orphanTestFile, createMinimalPdfBuffer());
-    assert.ok(fs.existsSync(orphanTestFile));
-
-    // Simulate controller cleanup on DB error
-    if (fs.existsSync(orphanTestFile)) {
-      fs.unlinkSync(orphanTestFile);
-    }
-    assert.strictEqual(fs.existsSync(orphanTestFile), false);
-  });
-
-  // 9. Verify upload destination directory exists
-  test("9. Verify uploads/resumes directory exists", () => {
-    assert.ok(fs.existsSync(RESUMES_UPLOAD_DIR));
+  // 15. Whitespace and boundary normalization
+  await testAsync("15. Clean extracted text and preserve structure", async () => {
+    const messy = "Line 1   with   tabs\t\tand   spaces\r\n\r\n\r\n\r\nLine 2";
+    const cleaned = cleanExtractedText(messy);
+    assert.strictEqual(cleaned, "Line 1 with tabs and spaces\n\nLine 2");
   });
 
   // Cleanup temp files

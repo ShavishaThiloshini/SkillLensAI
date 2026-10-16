@@ -11,12 +11,24 @@ import {
   Clock,
   Sparkles,
   X,
+  Play,
+  Mail,
+  Phone,
+  MapPin,
+  Link,
+  ExternalLink,
+  Globe,
+  Award,
+  Briefcase,
+  GraduationCap,
+  FolderGit2,
+  Code2,
 } from 'lucide-react'
 import Button from '../components/common/Button'
 import Card, { CardBody, CardHeader } from '../components/common/Card'
 import Modal from '../components/common/Modal'
 import Spinner from '../components/common/Spinner'
-import { uploadResume, getResumes } from '../services/resumeService'
+import { uploadResume, getResumes, getResumeById, extractResume } from '../services/resumeService'
 import styles from './Resume.module.css'
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB
@@ -59,6 +71,10 @@ export default function ResumePage() {
   // Details Modal state
   const [activeResume, setActiveResume] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState('candidate') // 'candidate', 'skills', 'experience', 'education', 'projects', 'certifications', 'raw'
+  const [isExtracting, setIsExtracting] = useState(false)
+  const [extractionError, setExtractionError] = useState('')
+  const [extractionSuccess, setExtractionSuccess] = useState('')
 
   const fileInputRef = useRef(null)
 
@@ -169,14 +185,13 @@ export default function ResumePage() {
         setUploadSuccess({
           message:
             result.message ||
-            'Resume uploaded successfully! Document is verified and ready for Day 11 text extraction.',
+            'Resume uploaded successfully! Document is verified and ready for extraction.',
           resume: result.resume,
         })
         setSelectedFile(null)
         if (fileInputRef.current) {
           fileInputRef.current.value = ''
         }
-        // Refresh resume list from backend
         await loadResumes()
       } else {
         setUploadError(result?.message || 'Upload failed. Please try again.')
@@ -200,9 +215,47 @@ export default function ResumePage() {
     }
   }
 
-  const handleOpenDetails = (resume) => {
+  const handleOpenDetails = async (resume) => {
     setActiveResume(resume)
     setIsModalOpen(true)
+    setActiveTab('candidate')
+    setExtractionError('')
+    setExtractionSuccess('')
+
+    // Fetch full extracted details
+    try {
+      const full = await getResumeById(resume.id)
+      if (full?.success && full.resume) {
+        setActiveResume(full.resume)
+      }
+    } catch (err) {
+      console.warn('Could not load rich details:', err.message)
+    }
+  }
+
+  const handleTriggerExtract = async (resumeId) => {
+    setIsExtracting(true)
+    setExtractionError('')
+    setExtractionSuccess('')
+
+    try {
+      const result = await extractResume(resumeId)
+      if (result?.success) {
+        setExtractionSuccess(result.message || 'Text extracted and structured information parsed!')
+        // Reload details and list
+        const updated = await getResumeById(resumeId)
+        if (updated?.success && updated.resume) {
+          setActiveResume(updated.resume)
+        }
+        await loadResumes()
+      } else {
+        setExtractionError(result?.message || 'Text extraction failed.')
+      }
+    } catch (err) {
+      setExtractionError(err.message || 'Failed to extract resume text.')
+    } finally {
+      setIsExtracting(false)
+    }
   }
 
   const getFileExtensionBadge = (filename) => {
@@ -218,6 +271,29 @@ export default function ResumePage() {
     )
   }
 
+  const getStatusBadge = (status) => {
+    const s = (status || 'UPLOADED').toUpperCase()
+    let cls = styles.statusUploaded
+    if (s === 'PROCESSING') cls = styles.statusProcessing
+    else if (s === 'COMPLETED') cls = styles.statusCompleted
+    else if (s === 'FAILED') cls = styles.statusFailed
+
+    return (
+      <span className={`${styles.statusPill} ${cls}`}>
+        <span className={styles.statusDot} />
+        {s}
+      </span>
+    )
+  }
+
+  const candidate = activeResume?.structuredData?.candidate || {}
+  const skills = activeResume?.skills || activeResume?.structuredData?.skills || []
+  const education = activeResume?.structuredData?.education || []
+  const experience = activeResume?.structuredData?.experience || []
+  const projects = activeResume?.structuredData?.projects || []
+  const certifications = activeResume?.structuredData?.certifications || []
+  const sections = activeResume?.sections || activeResume?.structuredData?.sections || []
+
   return (
     <div className={styles.container}>
       {/* Page Header */}
@@ -225,13 +301,13 @@ export default function ResumePage() {
         <div className={styles.titleRow}>
           <h1 className={styles.title}>Resume Management</h1>
           <span className={styles.stageBadge}>
-            <Sparkles size={14} /> Day 10: Ingestion & Validation
+            <Sparkles size={14} /> Day 11: Text Extraction &amp; Parsing
           </span>
         </div>
         <p className={styles.description}>
           Upload your resume in PDF or Word (DOCX) format. SkillLens AI validates
-          the internal structure, securely stores the document, and prepares it for
-          deep text extraction and skill gap analysis.
+          the internal structure, securely extracts text, and parses structured
+          information (candidate info, skills, experience, education, projects, and certifications).
         </p>
       </div>
 
@@ -370,7 +446,7 @@ export default function ResumePage() {
                       onClick={() => handleOpenDetails(uploadSuccess.resume)}
                       icon={Eye}
                     >
-                      View Metadata
+                      View Details &amp; Extract
                     </Button>
                   </div>
                 )}
@@ -462,7 +538,7 @@ export default function ResumePage() {
                   <th>Size</th>
                   <th>Status</th>
                   <th>Uploaded Date</th>
-                  <th style={{ textAlign: 'right' }}>Action</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -487,12 +563,7 @@ export default function ResumePage() {
                       </span>
                     </td>
                     <td>{formatBytes(item.file_size)}</td>
-                    <td>
-                      <span className={`${styles.statusPill} ${styles.statusUploaded}`}>
-                        <span className={styles.statusDot} />
-                        {item.processing_status || 'UPLOADED'}
-                      </span>
-                    </td>
+                    <td>{getStatusBadge(item.processing_status)}</td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', color: 'var(--color-text-secondary)', fontSize: 'var(--text-xs)' }}>
                         <Clock size={12} />
@@ -500,14 +571,29 @@ export default function ResumePage() {
                       </div>
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleOpenDetails(item)}
-                        icon={Eye}
-                      >
-                        Details
-                      </Button>
+                      <div style={{ display: 'inline-flex', gap: 'var(--space-2)' }}>
+                        {item.processing_status !== 'COMPLETED' ? (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => {
+                              handleOpenDetails(item)
+                              handleTriggerExtract(item.id)
+                            }}
+                            icon={Play}
+                          >
+                            Extract
+                          </Button>
+                        ) : null}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenDetails(item)}
+                          icon={Eye}
+                        >
+                          View
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -517,62 +603,376 @@ export default function ResumePage() {
         )}
       </Card>
 
-      {/* Metadata Detail Modal */}
+      {/* Structured Details Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Resume Metadata"
-        size="md"
+        title={activeResume?.original_filename || 'Resume Information'}
+        size="lg"
         footer={
-          <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
-            Close
-          </Button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+            <div>
+              {activeResume && activeResume.processing_status !== 'COMPLETED' && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => handleTriggerExtract(activeResume.id)}
+                  loading={isExtracting}
+                  icon={Play}
+                >
+                  {isExtracting ? 'Extracting...' : 'Extract Resume Information'}
+                </Button>
+              )}
+            </div>
+            <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
+              Close
+            </Button>
+          </div>
         }
       >
         {activeResume && (
           <div>
-            <div className={styles.metaGrid}>
-              <div className={styles.metaItem}>
-                <span className={styles.metaLabel}>Resume ID</span>
-                <span className={styles.metaValue}>#{activeResume.id}</span>
+            {/* Header info & Status Banner */}
+            <div className={styles.candidateHeader}>
+              <div>
+                <h3 className={styles.candidateName}>
+                  {candidate.full_name || 'Candidate Name Not Detected'}
+                </h3>
+                <div className={styles.candidateContactGrid}>
+                  <div className={styles.contactItem}>
+                    <Mail size={14} />
+                    <span>{candidate.email || <span className={styles.notDetected}>Email not detected</span>}</span>
+                  </div>
+                  <div className={styles.contactItem}>
+                    <Phone size={14} />
+                    <span>{candidate.phone || <span className={styles.notDetected}>Phone not detected</span>}</span>
+                  </div>
+                  <div className={styles.contactItem}>
+                    <MapPin size={14} />
+                    <span>{candidate.location || <span className={styles.notDetected}>Location not detected</span>}</span>
+                  </div>
+                  {candidate.linkedin_url && (
+                    <div className={styles.contactItem}>
+                      <Link size={14} />
+                      <a href={candidate.linkedin_url} target="_blank" rel="noreferrer" style={{ color: 'var(--color-indigo)' }}>
+                        LinkedIn Profile
+                      </a>
+                    </div>
+                  )}
+                  {candidate.github_url && (
+                    <div className={styles.contactItem}>
+                      <ExternalLink size={14} />
+                      <a href={candidate.github_url} target="_blank" rel="noreferrer" style={{ color: 'var(--color-indigo)' }}>
+                        GitHub Profile
+                      </a>
+                    </div>
+                  )}
+                  {candidate.portfolio_url && (
+                    <div className={styles.contactItem}>
+                      <Globe size={14} />
+                      <a href={candidate.portfolio_url} target="_blank" rel="noreferrer" style={{ color: 'var(--color-indigo)' }}>
+                        Portfolio
+                      </a>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className={styles.metaItem}>
-                <span className={styles.metaLabel}>Document Format</span>
-                <span className={styles.metaValue}>{activeResume.file_type}</span>
-              </div>
-              <div className={styles.metaItem}>
-                <span className={styles.metaLabel}>Original Filename</span>
-                <span className={styles.metaValue}>{activeResume.original_filename}</span>
-              </div>
-              <div className={styles.metaItem}>
-                <span className={styles.metaLabel}>File Size</span>
-                <span className={styles.metaValue}>
-                  {formatBytes(activeResume.file_size)} ({Number(activeResume.file_size).toLocaleString()} bytes)
-                </span>
-              </div>
-              <div className={styles.metaItem}>
-                <span className={styles.metaLabel}>Processing Status</span>
-                <span className={styles.metaValue}>
-                  <span className={`${styles.statusPill} ${styles.statusUploaded}`}>
-                    <span className={styles.statusDot} />
-                    {activeResume.processing_status || 'UPLOADED'}
-                  </span>
-                </span>
-              </div>
-              <div className={styles.metaItem}>
-                <span className={styles.metaLabel}>Upload Timestamp</span>
-                <span className={styles.metaValue}>{formatDate(activeResume.created_at)}</span>
-              </div>
+              <div>{getStatusBadge(activeResume.processing_status)}</div>
             </div>
 
-            <div className={styles.metaNoteBox}>
-              <strong>Current Stage: Ingestion &amp; Storage (Day 10)</strong>
-              <p style={{ margin: 'var(--space-1) 0 0 0' }}>
-                This resume has been securely stored on the server. In Day 11, the
-                text extraction pipeline will parse raw content and sections from this
-                document for skill gap comparison.
-              </p>
+            {/* Extraction Notifications */}
+            {extractionSuccess && (
+              <div className={`${styles.alert} ${styles.alertSuccess}`} role="alert" style={{ marginBottom: 'var(--space-4)' }}>
+                <CheckCircle2 size={18} />
+                <div className={styles.alertContent}>
+                  <div className={styles.alertTitle}>Extraction Complete</div>
+                  <div className={styles.alertMessage}>{extractionSuccess}</div>
+                </div>
+              </div>
+            )}
+
+            {extractionError && (
+              <div className={`${styles.alert} ${styles.alertError}`} role="alert" style={{ marginBottom: 'var(--space-4)' }}>
+                <AlertCircle size={18} />
+                <div className={styles.alertContent}>
+                  <div className={styles.alertTitle}>Extraction Error</div>
+                  <div className={styles.alertMessage}>{extractionError}</div>
+                  <div className={styles.alertActions}>
+                    <Button variant="danger" size="sm" onClick={() => handleTriggerExtract(activeResume.id)}>
+                      Retry Extraction
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Navigation Tabs */}
+            <div className={styles.modalTabs}>
+              <button
+                type="button"
+                className={`${styles.tabBtn} ${activeTab === 'candidate' ? styles.tabBtnActive : ''}`}
+                onClick={() => setActiveTab('candidate')}
+              >
+                Overview &amp; Metadata
+              </button>
+              <button
+                type="button"
+                className={`${styles.tabBtn} ${activeTab === 'skills' ? styles.tabBtnActive : ''}`}
+                onClick={() => setActiveTab('skills')}
+              >
+                Skills ({skills.length})
+              </button>
+              <button
+                type="button"
+                className={`${styles.tabBtn} ${activeTab === 'experience' ? styles.tabBtnActive : ''}`}
+                onClick={() => setActiveTab('experience')}
+              >
+                Experience ({experience.length})
+              </button>
+              <button
+                type="button"
+                className={`${styles.tabBtn} ${activeTab === 'education' ? styles.tabBtnActive : ''}`}
+                onClick={() => setActiveTab('education')}
+              >
+                Education ({education.length})
+              </button>
+              <button
+                type="button"
+                className={`${styles.tabBtn} ${activeTab === 'projects' ? styles.tabBtnActive : ''}`}
+                onClick={() => setActiveTab('projects')}
+              >
+                Projects ({projects.length})
+              </button>
+              <button
+                type="button"
+                className={`${styles.tabBtn} ${activeTab === 'certifications' ? styles.tabBtnActive : ''}`}
+                onClick={() => setActiveTab('certifications')}
+              >
+                Certifications ({certifications.length})
+              </button>
+              <button
+                type="button"
+                className={`${styles.tabBtn} ${activeTab === 'sections' ? styles.tabBtnActive : ''}`}
+                onClick={() => setActiveTab('sections')}
+              >
+                Detected Sections ({sections.length})
+              </button>
             </div>
+
+            {/* Tab: Overview & Metadata */}
+            {activeTab === 'candidate' && (
+              <div>
+                <div className={styles.metaGrid}>
+                  <div className={styles.metaItem}>
+                    <span className={styles.metaLabel}>Resume ID</span>
+                    <span className={styles.metaValue}>#{activeResume.id}</span>
+                  </div>
+                  <div className={styles.metaItem}>
+                    <span className={styles.metaLabel}>Document Format</span>
+                    <span className={styles.metaValue}>{activeResume.file_type}</span>
+                  </div>
+                  <div className={styles.metaItem}>
+                    <span className={styles.metaLabel}>Original Filename</span>
+                    <span className={styles.metaValue}>{activeResume.original_filename}</span>
+                  </div>
+                  <div className={styles.metaItem}>
+                    <span className={styles.metaLabel}>File Size</span>
+                    <span className={styles.metaValue}>
+                      {formatBytes(activeResume.file_size)}
+                    </span>
+                  </div>
+                  <div className={styles.metaItem}>
+                    <span className={styles.metaLabel}>Processing Status</span>
+                    <span className={styles.metaValue}>
+                      {getStatusBadge(activeResume.processing_status)}
+                    </span>
+                  </div>
+                  <div className={styles.metaItem}>
+                    <span className={styles.metaLabel}>Uploaded At</span>
+                    <span className={styles.metaValue}>{formatDate(activeResume.created_at)}</span>
+                  </div>
+                </div>
+
+                {activeResume.processing_status !== 'COMPLETED' ? (
+                  <div className={styles.metaNoteBox}>
+                    <strong>Ready for Extraction (Day 11)</strong>
+                    <p style={{ margin: 'var(--space-1) 0 0 0' }}>
+                      Click <strong>Extract Resume Information</strong> below to extract all sections,
+                      skills, and work history from this {activeResume.file_type} document without sending data to third parties.
+                    </p>
+                  </div>
+                ) : (
+                  <div className={styles.metaNoteBox} style={{ backgroundColor: '#ecfdf5', borderColor: '#a7f3d0', color: '#065f46' }}>
+                    <strong>Extraction Completed</strong>
+                    <p style={{ margin: 'var(--space-1) 0 0 0' }}>
+                      Document parsed successfully! Structured sections, skills, and qualifications are stored in Aiven MySQL.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tab: Skills */}
+            {activeTab === 'skills' && (
+              <div>
+                {skills.length === 0 ? (
+                  <p className={styles.notDetected}>No skills detected in this resume yet.</p>
+                ) : (
+                  <div className={styles.skillsList}>
+                    {skills.map((s, idx) => (
+                      <span key={idx} className={styles.skillPill} title={s.evidence || s.category}>
+                        <Code2 size={13} />
+                        {s.name}
+                        <small style={{ color: 'var(--color-text-muted)', fontSize: '10px' }}>
+                          ({s.category})
+                        </small>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tab: Experience */}
+            {activeTab === 'experience' && (
+              <div>
+                {experience.length === 0 ? (
+                  <p className={styles.notDetected}>No work experience entries detected.</p>
+                ) : (
+                  experience.map((exp, idx) => (
+                    <div key={idx} className={styles.sectionCard}>
+                      <div className={styles.sectionHeader}>
+                        <h4 className={styles.sectionTitle}>
+                          <Briefcase size={15} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+                          {exp.title}
+                        </h4>
+                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                          {exp.dates}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', margin: '0 0 var(--space-2) 0', color: 'var(--color-indigo)' }}>
+                        {exp.company}
+                      </p>
+                      {exp.responsibilities && (
+                        <p className={styles.sectionContent}>{exp.responsibilities}</p>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Tab: Education */}
+            {activeTab === 'education' && (
+              <div>
+                {education.length === 0 ? (
+                  <p className={styles.notDetected}>No education records detected.</p>
+                ) : (
+                  education.map((edu, idx) => (
+                    <div key={idx} className={styles.sectionCard}>
+                      <div className={styles.sectionHeader}>
+                        <h4 className={styles.sectionTitle}>
+                          <GraduationCap size={15} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+                          {edu.qualification}
+                        </h4>
+                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                          {edu.dates || ''}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', margin: '0 0 var(--space-1) 0', color: 'var(--color-indigo)' }}>
+                        {edu.institution}
+                      </p>
+                      {edu.grade && (
+                        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', margin: '0 0 var(--space-1) 0' }}>
+                          Grade / Result: {edu.grade}
+                        </p>
+                      )}
+                      {edu.details && <p className={styles.sectionContent}>{edu.details}</p>}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Tab: Projects */}
+            {activeTab === 'projects' && (
+              <div>
+                {projects.length === 0 ? (
+                  <p className={styles.notDetected}>No projects detected.</p>
+                ) : (
+                  projects.map((proj, idx) => (
+                    <div key={idx} className={styles.sectionCard}>
+                      <div className={styles.sectionHeader}>
+                        <h4 className={styles.sectionTitle}>
+                          <FolderGit2 size={15} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+                          {proj.name}
+                        </h4>
+                        {proj.url && (
+                          <a href={proj.url} target="_blank" rel="noreferrer" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-indigo)' }}>
+                            Project Link
+                          </a>
+                        )}
+                      </div>
+                      {proj.technologies && (
+                        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-indigo)', margin: '0 0 var(--space-1) 0' }}>
+                          Tech: {proj.technologies}
+                        </p>
+                      )}
+                      {proj.description && <p className={styles.sectionContent}>{proj.description}</p>}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Tab: Certifications */}
+            {activeTab === 'certifications' && (
+              <div>
+                {certifications.length === 0 ? (
+                  <p className={styles.notDetected}>No certifications detected.</p>
+                ) : (
+                  certifications.map((c, idx) => (
+                    <div key={idx} className={styles.sectionCard}>
+                      <div className={styles.sectionHeader}>
+                        <h4 className={styles.sectionTitle}>
+                          <Award size={15} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+                          {c.name}
+                        </h4>
+                        {c.date && (
+                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                            {c.date}
+                          </span>
+                        )}
+                      </div>
+                      <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-indigo)', margin: 0 }}>
+                        Issued by: {c.issuer}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Tab: Sections */}
+            {activeTab === 'sections' && (
+              <div>
+                {sections.length === 0 ? (
+                  <p className={styles.notDetected}>No structured sections detected yet.</p>
+                ) : (
+                  sections.map((sec, idx) => (
+                    <div key={idx} className={styles.sectionCard}>
+                      <div className={styles.sectionHeader}>
+                        <h4 className={styles.sectionTitle}>{sec.section_type}</h4>
+                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                          Order #{sec.display_order}
+                        </span>
+                      </div>
+                      <p className={styles.sectionContent}>{sec.section_content}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         )}
       </Modal>

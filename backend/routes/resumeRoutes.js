@@ -5,6 +5,7 @@ const {
   uploadResume,
   getUserResumes,
   getResumeById,
+  extractResume,
 } = require("../controllers/resumeController");
 const authenticateToken = require("../middleware/authMiddleware");
 const {
@@ -21,7 +22,11 @@ router.post("/", uploadMiddleware, handleUploadError, uploadResume);
 // List authenticated user's resumes
 router.get("/", getUserResumes);
 
-// Retrieve metadata for a single resume owned by the user
+// Retrieve metadata and extracted sections for a single resume owned by the user
 router.get("/:id", getResumeById);
 
+// Trigger text extraction and structured parsing for a stored resume
+router.post("/:id/extract", extractResume);
+
 module.exports = router;
+
