@@ -172,6 +172,7 @@ async function getResumeById(req, res) {
     });
   }
 
+  try {
     const resumeData = await ResumeService.getResumeWithExtraction(resumeId, userId);
 
     if (!resumeData) {
@@ -186,6 +187,7 @@ async function getResumeById(req, res) {
       resume: resumeData,
     });
   } catch (error) {
+
     console.error("[ResumeController] Failed to retrieve resume:", error.message);
     return res.status(500).json({
       success: false,
