@@ -23,12 +23,15 @@ import {
   GraduationCap,
   FolderGit2,
   Code2,
+  AlertTriangle,
+  User,
+  AlignLeft,
 } from 'lucide-react'
 import Button from '../components/common/Button'
 import Card, { CardBody, CardHeader } from '../components/common/Card'
 import Modal from '../components/common/Modal'
 import Spinner from '../components/common/Spinner'
-import { uploadResume, getResumes, getResumeById, extractResume } from '../services/resumeService'
+import { uploadResume, getResumes, getResumeById, extractResume, parseResume } from '../services/resumeService'
 import styles from './Resume.module.css'
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB
@@ -286,13 +289,24 @@ export default function ResumePage() {
     )
   }
 
-  const candidate = activeResume?.structuredData?.candidate || {}
-  const skills = activeResume?.skills || activeResume?.structuredData?.skills || []
-  const education = activeResume?.structuredData?.education || []
-  const experience = activeResume?.structuredData?.experience || []
-  const projects = activeResume?.structuredData?.projects || []
-  const certifications = activeResume?.structuredData?.certifications || []
+  const structuredModel = activeResume?.structuredModel || activeResume?.structuredData?.structuredModel || null
+  const candidate = structuredModel?.personalInformation || {
+    fullName: activeResume?.structuredData?.candidate?.full_name || null,
+    email: activeResume?.structuredData?.candidate?.email || null,
+    phone: activeResume?.structuredData?.candidate?.phone || null,
+    location: activeResume?.structuredData?.candidate?.location || null,
+    linkedinUrl: activeResume?.structuredData?.candidate?.linkedin_url || null,
+    githubUrl: activeResume?.structuredData?.candidate?.github_url || null,
+    portfolioUrl: activeResume?.structuredData?.candidate?.portfolio_url || null,
+  }
+  const summary = structuredModel?.summary || activeResume?.structuredData?.summary || null
+  const skills = structuredModel?.skills || activeResume?.skills || activeResume?.structuredData?.skills || []
+  const education = structuredModel?.education || activeResume?.structuredData?.education || []
+  const experience = structuredModel?.experience || activeResume?.structuredData?.experience || []
+  const projects = structuredModel?.projects || activeResume?.structuredData?.projects || []
+  const certifications = structuredModel?.certifications || activeResume?.structuredData?.certifications || []
   const sections = activeResume?.sections || activeResume?.structuredData?.sections || []
+  const parsingWarnings = structuredModel?.parsingMetadata?.warnings || []
 
   return (
     <div className={styles.container}>
@@ -301,13 +315,14 @@ export default function ResumePage() {
         <div className={styles.titleRow}>
           <h1 className={styles.title}>Resume Management</h1>
           <span className={styles.stageBadge}>
-            <Sparkles size={14} /> Day 11: Text Extraction &amp; Parsing
+            <Sparkles size={14} /> Day 12: Structured Resume Parser
           </span>
         </div>
         <p className={styles.description}>
           Upload your resume in PDF or Word (DOCX) format. SkillLens AI validates
-          the internal structure, securely extracts text, and parses structured
-          information (candidate info, skills, experience, education, projects, and certifications).
+          the internal structure, securely extracts text, and organizes information into a
+          canonical structured data model (Personal Information, Summary, Skills, Education,
+          Experience, Projects, and Certifications) stored in Aiven MySQL.
         </p>
       </div>
 
@@ -636,7 +651,7 @@ export default function ResumePage() {
             <div className={styles.candidateHeader}>
               <div>
                 <h3 className={styles.candidateName}>
-                  {candidate.full_name || 'Candidate Name Not Detected'}
+                  {candidate.fullName || 'Candidate Name Not Detected'}
                 </h3>
                 <div className={styles.candidateContactGrid}>
                   <div className={styles.contactItem}>
@@ -651,26 +666,26 @@ export default function ResumePage() {
                     <MapPin size={14} />
                     <span>{candidate.location || <span className={styles.notDetected}>Location not detected</span>}</span>
                   </div>
-                  {candidate.linkedin_url && (
+                  {candidate.linkedinUrl && (
                     <div className={styles.contactItem}>
                       <Link size={14} />
-                      <a href={candidate.linkedin_url} target="_blank" rel="noreferrer" style={{ color: 'var(--color-indigo)' }}>
+                      <a href={candidate.linkedinUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--color-indigo)' }}>
                         LinkedIn Profile
                       </a>
                     </div>
                   )}
-                  {candidate.github_url && (
+                  {candidate.githubUrl && (
                     <div className={styles.contactItem}>
                       <ExternalLink size={14} />
-                      <a href={candidate.github_url} target="_blank" rel="noreferrer" style={{ color: 'var(--color-indigo)' }}>
+                      <a href={candidate.githubUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--color-indigo)' }}>
                         GitHub Profile
                       </a>
                     </div>
                   )}
-                  {candidate.portfolio_url && (
+                  {candidate.portfolioUrl && (
                     <div className={styles.contactItem}>
                       <Globe size={14} />
-                      <a href={candidate.portfolio_url} target="_blank" rel="noreferrer" style={{ color: 'var(--color-indigo)' }}>
+                      <a href={candidate.portfolioUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--color-indigo)' }}>
                         Portfolio
                       </a>
                     </div>
@@ -679,6 +694,21 @@ export default function ResumePage() {
               </div>
               <div>{getStatusBadge(activeResume.processing_status)}</div>
             </div>
+
+            {/* Parsing Warnings Banner */}
+            {parsingWarnings.length > 0 && (
+              <div className={`${styles.alert} ${styles.alertWarning}`} role="alert" style={{ marginBottom: 'var(--space-4)' }}>
+                <AlertTriangle size={18} />
+                <div className={styles.alertContent}>
+                  <div className={styles.alertTitle}>Parser Warnings ({parsingWarnings.length})</div>
+                  <ul style={{ margin: 'var(--space-1) 0 0 0', paddingLeft: 'var(--space-4)', fontSize: 'var(--text-xs)' }}>
+                    {parsingWarnings.map((w, i) => (
+                      <li key={i}>{w}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
 
             {/* Extraction Notifications */}
             {extractionSuccess && (
@@ -713,7 +743,14 @@ export default function ResumePage() {
                 className={`${styles.tabBtn} ${activeTab === 'candidate' ? styles.tabBtnActive : ''}`}
                 onClick={() => setActiveTab('candidate')}
               >
-                Overview &amp; Metadata
+                Overview
+              </button>
+              <button
+                type="button"
+                className={`${styles.tabBtn} ${activeTab === 'summary' ? styles.tabBtnActive : ''}`}
+                onClick={() => setActiveTab('summary')}
+              >
+                Summary
               </button>
               <button
                 type="button"
@@ -755,7 +792,7 @@ export default function ResumePage() {
                 className={`${styles.tabBtn} ${activeTab === 'sections' ? styles.tabBtnActive : ''}`}
                 onClick={() => setActiveTab('sections')}
               >
-                Detected Sections ({sections.length})
+                Raw Sections ({sections.length})
               </button>
             </div>
 
@@ -795,7 +832,7 @@ export default function ResumePage() {
 
                 {activeResume.processing_status !== 'COMPLETED' ? (
                   <div className={styles.metaNoteBox}>
-                    <strong>Ready for Extraction (Day 11)</strong>
+                    <strong>Ready for Extraction &amp; Structured Parsing (Day 12)</strong>
                     <p style={{ margin: 'var(--space-1) 0 0 0' }}>
                       Click <strong>Extract Resume Information</strong> below to extract all sections,
                       skills, and work history from this {activeResume.file_type} document without sending data to third parties.
@@ -803,9 +840,30 @@ export default function ResumePage() {
                   </div>
                 ) : (
                   <div className={styles.metaNoteBox} style={{ backgroundColor: '#ecfdf5', borderColor: '#a7f3d0', color: '#065f46' }}>
-                    <strong>Extraction Completed</strong>
+                    <strong>Structured Parsing Completed</strong>
                     <p style={{ margin: 'var(--space-1) 0 0 0' }}>
-                      Document parsed successfully! Structured sections, skills, and qualifications are stored in Aiven MySQL.
+                      Document parsed and normalized into structured data model! Personal info, summary, skills, education, experience, projects, and certifications are stored in Aiven MySQL.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tab: Summary */}
+            {activeTab === 'summary' && (
+              <div>
+                {!summary ? (
+                  <p className={styles.notDetected}>No professional summary or career objective detected in this resume.</p>
+                ) : (
+                  <div className={styles.sectionCard}>
+                    <div className={styles.sectionHeader}>
+                      <h4 className={styles.sectionTitle}>
+                        <AlignLeft size={15} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+                        Professional Summary
+                      </h4>
+                    </div>
+                    <p className={styles.sectionContent} style={{ fontSize: 'var(--text-sm)', lineHeight: '1.6' }}>
+                      {summary}
                     </p>
                   </div>
                 )}
@@ -839,25 +897,42 @@ export default function ResumePage() {
                 {experience.length === 0 ? (
                   <p className={styles.notDetected}>No work experience entries detected.</p>
                 ) : (
-                  experience.map((exp, idx) => (
-                    <div key={idx} className={styles.sectionCard}>
-                      <div className={styles.sectionHeader}>
-                        <h4 className={styles.sectionTitle}>
-                          <Briefcase size={15} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-                          {exp.title}
-                        </h4>
-                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                          {exp.dates}
-                        </span>
+                  experience.map((exp, idx) => {
+                    const title = exp.jobTitle || exp.title
+                    const company = exp.company || 'Not detected'
+                    const dates = exp.startDate && exp.endDate ? `${exp.startDate} - ${exp.endDate}` : (exp.dates || exp.startDate || 'Dates not detected')
+                    const resp = Array.isArray(exp.responsibilities) ? exp.responsibilities.join(' ') : exp.responsibilities
+                    const techs = Array.isArray(exp.technologies) ? exp.technologies : []
+
+                    return (
+                      <div key={idx} className={styles.sectionCard}>
+                        <div className={styles.sectionHeader}>
+                          <h4 className={styles.sectionTitle}>
+                            <Briefcase size={15} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+                            {title}
+                          </h4>
+                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                            {dates} {exp.isCurrent && <span style={{ color: 'var(--color-success)', fontWeight: 'bold' }}> (Current)</span>}
+                          </span>
+                        </div>
+                        <p style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', margin: '0 0 var(--space-2) 0', color: 'var(--color-indigo)' }}>
+                          {company} {exp.location && <span> &bull; {exp.location}</span>}
+                        </p>
+                        {resp && (
+                          <p className={styles.sectionContent}>{resp}</p>
+                        )}
+                        {techs.length > 0 && (
+                          <div style={{ marginTop: 'var(--space-2)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1)' }}>
+                            {techs.map((t, ti) => (
+                              <span key={ti} className={styles.skillPill} style={{ fontSize: '11px', padding: '0.15rem 0.45rem' }}>
+                                {t}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      <p style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', margin: '0 0 var(--space-2) 0', color: 'var(--color-indigo)' }}>
-                        {exp.company}
-                      </p>
-                      {exp.responsibilities && (
-                        <p className={styles.sectionContent}>{exp.responsibilities}</p>
-                      )}
-                    </div>
-                  ))
+                    )
+                  })
                 )}
               </div>
             )}
@@ -868,28 +943,42 @@ export default function ResumePage() {
                 {education.length === 0 ? (
                   <p className={styles.notDetected}>No education records detected.</p>
                 ) : (
-                  education.map((edu, idx) => (
-                    <div key={idx} className={styles.sectionCard}>
-                      <div className={styles.sectionHeader}>
-                        <h4 className={styles.sectionTitle}>
-                          <GraduationCap size={15} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-                          {edu.qualification}
-                        </h4>
-                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                          {edu.dates || ''}
-                        </span>
-                      </div>
-                      <p style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', margin: '0 0 var(--space-1) 0', color: 'var(--color-indigo)' }}>
-                        {edu.institution}
-                      </p>
-                      {edu.grade && (
-                        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', margin: '0 0 var(--space-1) 0' }}>
-                          Grade / Result: {edu.grade}
+                  education.map((edu, idx) => {
+                    const qual = edu.qualification || 'Degree / Qualification'
+                    const inst = edu.institution || 'Not detected'
+                    const dates = edu.startDate && edu.endDate ? `${edu.startDate} - ${edu.endDate}` : (edu.dates || edu.startDate || '')
+                    const field = edu.fieldOfStudy || edu.field_of_study
+                    const grade = edu.grade
+                    const details = edu.description || edu.details
+
+                    return (
+                      <div key={idx} className={styles.sectionCard}>
+                        <div className={styles.sectionHeader}>
+                          <h4 className={styles.sectionTitle}>
+                            <GraduationCap size={15} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+                            {qual}
+                          </h4>
+                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                            {dates}
+                          </span>
+                        </div>
+                        <p style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', margin: '0 0 var(--space-1) 0', color: 'var(--color-indigo)' }}>
+                          {inst}
                         </p>
-                      )}
-                      {edu.details && <p className={styles.sectionContent}>{edu.details}</p>}
-                    </div>
-                  ))
+                        {field && (
+                          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', margin: '0 0 var(--space-1) 0' }}>
+                            Field of Study: {field}
+                          </p>
+                        )}
+                        {grade && (
+                          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', margin: '0 0 var(--space-1) 0' }}>
+                            Grade / Result: {grade}
+                          </p>
+                        )}
+                        {details && <p className={styles.sectionContent}>{details}</p>}
+                      </div>
+                    )
+                  })
                 )}
               </div>
             )}
@@ -900,27 +989,32 @@ export default function ResumePage() {
                 {projects.length === 0 ? (
                   <p className={styles.notDetected}>No projects detected.</p>
                 ) : (
-                  projects.map((proj, idx) => (
-                    <div key={idx} className={styles.sectionCard}>
-                      <div className={styles.sectionHeader}>
-                        <h4 className={styles.sectionTitle}>
-                          <FolderGit2 size={15} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-                          {proj.name}
-                        </h4>
-                        {proj.url && (
-                          <a href={proj.url} target="_blank" rel="noreferrer" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-indigo)' }}>
-                            Project Link
-                          </a>
+                  projects.map((proj, idx) => {
+                    const link = proj.projectUrl || proj.githubUrl || proj.demoUrl || proj.url
+                    const techs = Array.isArray(proj.technologies) ? proj.technologies.join(', ') : proj.technologies
+
+                    return (
+                      <div key={idx} className={styles.sectionCard}>
+                        <div className={styles.sectionHeader}>
+                          <h4 className={styles.sectionTitle}>
+                            <FolderGit2 size={15} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+                            {proj.name}
+                          </h4>
+                          {link && (
+                            <a href={link} target="_blank" rel="noreferrer" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-indigo)' }}>
+                              Project Link
+                            </a>
+                          )}
+                        </div>
+                        {techs && (
+                          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-indigo)', margin: '0 0 var(--space-1) 0' }}>
+                            Tech: {techs}
+                          </p>
                         )}
+                        {proj.description && <p className={styles.sectionContent}>{proj.description}</p>}
                       </div>
-                      {proj.technologies && (
-                        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-indigo)', margin: '0 0 var(--space-1) 0' }}>
-                          Tech: {proj.technologies}
-                        </p>
-                      )}
-                      {proj.description && <p className={styles.sectionContent}>{proj.description}</p>}
-                    </div>
-                  ))
+                    )
+                  })
                 )}
               </div>
             )}
@@ -931,24 +1025,29 @@ export default function ResumePage() {
                 {certifications.length === 0 ? (
                   <p className={styles.notDetected}>No certifications detected.</p>
                 ) : (
-                  certifications.map((c, idx) => (
-                    <div key={idx} className={styles.sectionCard}>
-                      <div className={styles.sectionHeader}>
-                        <h4 className={styles.sectionTitle}>
-                          <Award size={15} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-                          {c.name}
-                        </h4>
-                        {c.date && (
-                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                            {c.date}
-                          </span>
-                        )}
+                  certifications.map((c, idx) => {
+                    const org = c.issuingOrganization || c.issuer || 'Not detected'
+                    const date = c.issueDate || c.date
+
+                    return (
+                      <div key={idx} className={styles.sectionCard}>
+                        <div className={styles.sectionHeader}>
+                          <h4 className={styles.sectionTitle}>
+                            <Award size={15} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+                            {c.name}
+                          </h4>
+                          {date && (
+                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                              {date}
+                            </span>
+                          )}
+                        </div>
+                        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-indigo)', margin: 0 }}>
+                          Issued by: {org}
+                        </p>
                       </div>
-                      <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-indigo)', margin: 0 }}>
-                        Issued by: {c.issuer}
-                      </p>
-                    </div>
-                  ))
+                    )
+                  })
                 )}
               </div>
             )}

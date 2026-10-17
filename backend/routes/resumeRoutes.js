@@ -6,6 +6,7 @@ const {
   getUserResumes,
   getResumeById,
   extractResume,
+  parseResume,
 } = require("../controllers/resumeController");
 const authenticateToken = require("../middleware/authMiddleware");
 const {
@@ -27,6 +28,9 @@ router.get("/:id", getResumeById);
 
 // Trigger text extraction and structured parsing for a stored resume
 router.post("/:id/extract", extractResume);
+
+// Day 12: Trigger structured parsing and validation directly for a stored resume
+router.post("/:id/parse", parseResume);
 
 module.exports = router;
 

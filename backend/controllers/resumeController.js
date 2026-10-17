@@ -236,6 +236,7 @@ async function extractResume(req, res) {
       processing_status: result.status,
       message: result.message,
       structuredData: result.structuredData,
+      structuredModel: result.structuredModel,
     });
   } catch (error) {
     console.error("[ResumeController] Extraction error:", error.message);
@@ -247,10 +248,64 @@ async function extractResume(req, res) {
   }
 }
 
+/**
+ * POST /api/resumes/:id/parse
+ * Day 12 structured resume parser endpoint.
+ * Validates ownership, processes structured resume model, persists to MySQL, and returns normalized data.
+ */
+async function parseResume(req, res) {
+  const userId = req.user?.id;
+  const resumeId = Number(req.params.id);
+
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      message: "Authentication required.",
+    });
+  }
+
+  if (!resumeId || Number.isNaN(resumeId)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid resume ID.",
+    });
+  }
+
+  try {
+    const result = await ResumeService.parseStructuredResume(resumeId, userId);
+
+    if (!result.success) {
+      return res.status(422).json({
+        success: false,
+        resumeId: result.resumeId,
+        processing_status: result.status,
+        message: result.message,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      resumeId: result.resumeId,
+      processing_status: result.status,
+      message: result.message,
+      structuredModel: result.structuredModel,
+      warnings: result.warnings || [],
+    });
+  } catch (error) {
+    console.error("[ResumeController] Parsing error:", error.message);
+    const status = error.status || 500;
+    return res.status(status).json({
+      success: false,
+      message: error.message || "Failed to parse structured resume.",
+    });
+  }
+}
+
 module.exports = {
   uploadResume,
   getUserResumes,
   getResumeById,
   extractResume,
+  parseResume,
 };
 

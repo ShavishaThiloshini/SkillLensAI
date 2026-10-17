@@ -81,8 +81,9 @@ class ResumeService {
 
     const rawText = extractionResult.text;
 
-    // 4. Parse text into structured resume sections and fields
+    // 4. Parse text into structured resume sections and fields using Day 12 structured parser
     const parsedData = parseResumeText(rawText);
+    const structuredModel = parsedData.structuredModel || {};
 
     // 5. Atomic database transaction to persist structured results
     const connection = await db.getConnection();
@@ -103,18 +104,86 @@ class ResumeService {
         [resumeId]
       );
 
-      // Insert extracted sections
-      if (parsedData.sections && parsedData.sections.length > 0) {
-        const sectionValues = parsedData.sections.map((sec) => [
-          resumeId,
-          sec.section_type,
-          sec.section_content,
-          sec.display_order,
-        ]);
+      // Insert extracted sections (incorporating structured JSON representation)
+      const sectionsToInsert = [];
+      let orderIdx = 0;
 
+      // Personal Information / Candidate section
+      if (structuredModel.personalInformation) {
+        sectionsToInsert.push([
+          resumeId,
+          "PERSONAL_INFO",
+          JSON.stringify(structuredModel.personalInformation),
+          orderIdx++,
+        ]);
+      }
+
+      // Summary section
+      if (structuredModel.summary) {
+        sectionsToInsert.push([
+          resumeId,
+          "SUMMARY",
+          structuredModel.summary,
+          orderIdx++,
+        ]);
+      }
+
+      // Experience section
+      if (structuredModel.experience && structuredModel.experience.length > 0) {
+        sectionsToInsert.push([
+          resumeId,
+          "EXPERIENCE",
+          JSON.stringify(structuredModel.experience),
+          orderIdx++,
+        ]);
+      }
+
+      // Education section
+      if (structuredModel.education && structuredModel.education.length > 0) {
+        sectionsToInsert.push([
+          resumeId,
+          "EDUCATION",
+          JSON.stringify(structuredModel.education),
+          orderIdx++,
+        ]);
+      }
+
+      // Projects section
+      if (structuredModel.projects && structuredModel.projects.length > 0) {
+        sectionsToInsert.push([
+          resumeId,
+          "PROJECTS",
+          JSON.stringify(structuredModel.projects),
+          orderIdx++,
+        ]);
+      }
+
+      // Certifications section
+      if (structuredModel.certifications && structuredModel.certifications.length > 0) {
+        sectionsToInsert.push([
+          resumeId,
+          "CERTIFICATIONS",
+          JSON.stringify(structuredModel.certifications),
+          orderIdx++,
+        ]);
+      }
+
+      // Also preserve parsed raw text sections from segmentation
+      if (parsedData.sections && parsedData.sections.length > 0) {
+        for (const sec of parsedData.sections) {
+          sectionsToInsert.push([
+            resumeId,
+            `RAW_${sec.section_type}`,
+            sec.section_content,
+            orderIdx++,
+          ]);
+        }
+      }
+
+      if (sectionsToInsert.length > 0) {
         await connection.query(
           `INSERT INTO resume_sections (resume_id, section_type, section_content, display_order) VALUES ?`,
-          [sectionValues]
+          [sectionsToInsert]
         );
       }
 
@@ -161,6 +230,7 @@ class ResumeService {
         status: "COMPLETED",
         message: "Resume extracted and structured information parsed successfully.",
         structuredData: parsedData,
+        structuredModel,
       };
     } catch (dbError) {
       await connection.rollback();
@@ -227,7 +297,208 @@ class ResumeService {
       sections: sections || [],
       skills: skills || (structured?.skills || []),
       structuredData: structured,
+      structuredModel: structured?.structuredModel || null,
     };
+  }
+
+  /**
+   * Day 12 Structured Parser entry point.
+   * Parses or re-parses a resume directly from stored extracted text (or extracts first if not yet extracted),
+   * validates the structured model, persists to Aiven MySQL, and returns the canonical structured resume model.
+   *
+   * @param {number} resumeId
+   * @param {number} userId
+   * @returns {Promise<{ success: boolean, resumeId: number, status: string, structuredModel: Object, warnings: string[] }>}
+   */
+  static async parseStructuredResume(resumeId, userId) {
+    if (!resumeId || !userId) {
+      throw new Error("Resume ID and User ID are required.");
+    }
+
+    const [resumes] = await db.query(
+      `SELECT id, user_id, original_filename, stored_filename, file_type, file_size, file_path, processing_status, extracted_text
+       FROM resumes
+       WHERE id = ? AND user_id = ?
+       LIMIT 1`,
+      [resumeId, userId]
+    );
+
+    if (!resumes || resumes.length === 0) {
+      const err = new Error("Resume not found or access denied.");
+      err.status = 404;
+      throw err;
+    }
+
+    const resume = resumes[0];
+
+    // If text has not been extracted yet, trigger full extraction pipeline first
+    if (!resume.extracted_text) {
+      const extractionResult = await this.extractResume(resumeId, userId);
+      if (!extractionResult.success) {
+        return {
+          success: false,
+          resumeId,
+          status: extractionResult.status,
+          message: extractionResult.message,
+        };
+      }
+      return {
+        success: true,
+        resumeId,
+        status: "COMPLETED",
+        message: "Resume extracted, parsed, and structured successfully.",
+        structuredModel: extractionResult.structuredModel,
+        warnings: extractionResult.structuredModel?.parsingMetadata?.warnings || [],
+      };
+    }
+
+    // Text is already extracted: run Day 12 structured parser and persist idempotently
+    const rawText = resume.extracted_text;
+    const parsedData = parseResumeText(rawText);
+    const structuredModel = parsedData.structuredModel;
+    structuredModel.resumeId = resumeId;
+
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      await connection.query(
+        `UPDATE resumes
+         SET processing_status = 'COMPLETED', updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [resumeId]
+      );
+
+      // Clean up previously parsed sections
+      await connection.query(
+        `DELETE FROM resume_sections WHERE resume_id = ?`,
+        [resumeId]
+      );
+
+      // Insert structured sections
+      const sectionsToInsert = [];
+      let orderIdx = 0;
+
+      if (structuredModel.personalInformation) {
+        sectionsToInsert.push([
+          resumeId,
+          "PERSONAL_INFO",
+          JSON.stringify(structuredModel.personalInformation),
+          orderIdx++,
+        ]);
+      }
+
+      if (structuredModel.summary) {
+        sectionsToInsert.push([
+          resumeId,
+          "SUMMARY",
+          structuredModel.summary,
+          orderIdx++,
+        ]);
+      }
+
+      if (structuredModel.experience && structuredModel.experience.length > 0) {
+        sectionsToInsert.push([
+          resumeId,
+          "EXPERIENCE",
+          JSON.stringify(structuredModel.experience),
+          orderIdx++,
+        ]);
+      }
+
+      if (structuredModel.education && structuredModel.education.length > 0) {
+        sectionsToInsert.push([
+          resumeId,
+          "EDUCATION",
+          JSON.stringify(structuredModel.education),
+          orderIdx++,
+        ]);
+      }
+
+      if (structuredModel.projects && structuredModel.projects.length > 0) {
+        sectionsToInsert.push([
+          resumeId,
+          "PROJECTS",
+          JSON.stringify(structuredModel.projects),
+          orderIdx++,
+        ]);
+      }
+
+      if (structuredModel.certifications && structuredModel.certifications.length > 0) {
+        sectionsToInsert.push([
+          resumeId,
+          "CERTIFICATIONS",
+          JSON.stringify(structuredModel.certifications),
+          orderIdx++,
+        ]);
+      }
+
+      if (parsedData.sections && parsedData.sections.length > 0) {
+        for (const sec of parsedData.sections) {
+          sectionsToInsert.push([
+            resumeId,
+            `RAW_${sec.section_type}`,
+            sec.section_content,
+            orderIdx++,
+          ]);
+        }
+      }
+
+      if (sectionsToInsert.length > 0) {
+        await connection.query(
+          `INSERT INTO resume_sections (resume_id, section_type, section_content, display_order) VALUES ?`,
+          [sectionsToInsert]
+        );
+      }
+
+      // Upsert skills
+      await connection.query(
+        `DELETE FROM resume_skills WHERE resume_id = ?`,
+        [resumeId]
+      );
+
+      if (parsedData.skills && parsedData.skills.length > 0) {
+        for (const skill of parsedData.skills) {
+          await connection.query(
+            `INSERT INTO skills (name, category)
+             VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE category = VALUES(category)`,
+            [skill.name, skill.category]
+          );
+
+          const [skillRow] = await connection.query(
+            `SELECT id FROM skills WHERE name = ? LIMIT 1`,
+            [skill.name]
+          );
+
+          if (skillRow && skillRow.length > 0) {
+            const skillId = skillRow[0].id;
+            await connection.query(
+              `INSERT INTO resume_skills (resume_id, skill_id, proficiency, evidence)
+               VALUES (?, ?, 'UNKNOWN', ?)
+               ON DUPLICATE KEY UPDATE evidence = VALUES(evidence)`,
+              [resumeId, skillId, skill.evidence || null]
+            );
+          }
+        }
+      }
+
+      await connection.commit();
+
+      return {
+        success: true,
+        resumeId,
+        status: "COMPLETED",
+        message: "Resume structured data parsed and stored successfully.",
+        structuredModel,
+        warnings: structuredModel.parsingMetadata.warnings || [],
+      };
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
   }
 }
 

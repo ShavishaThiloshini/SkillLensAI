@@ -1,6 +1,7 @@
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 const jwt = require("jsonwebtoken");
 
 const { validateResumeFile } = require("../utils/fileValidator");
@@ -270,6 +271,234 @@ async function runTests() {
     const messy = "Line 1   with   tabs\t\tand   spaces\r\n\r\n\r\n\r\nLine 2";
     const cleaned = cleanExtractedText(messy);
     assert.strictEqual(cleaned, "Line 1 with tabs and spaces\n\nLine 2");
+  });
+
+  // DAY 12: STRUCTURED RESUME PARSER TEST CASES
+  const {
+    parseResume,
+    createStructuredResumeModel,
+    validateStructuredResume,
+  } = require("../services/resumeParserService");
+
+  // 16. Parse resume containing all seven sections into canonical structured model
+  await testAsync("16. Parse resume with all seven sections into canonical structured data model", async () => {
+    const model = parseResume(SAMPLE_RESUME_TEXT, 42);
+    assert.strictEqual(model.resumeId, 42);
+
+    // 1. Personal Information
+    assert.strictEqual(model.personalInformation.fullName, "Jane Doe");
+    assert.strictEqual(model.personalInformation.email, "jane.doe@example.com");
+    assert.strictEqual(model.personalInformation.phone, "+94 77 123 4567");
+    assert.strictEqual(model.personalInformation.location, "Colombo, Sri Lanka");
+    assert.strictEqual(model.personalInformation.linkedinUrl, "https://linkedin.com/in/janedoe");
+    assert.strictEqual(model.personalInformation.githubUrl, "https://github.com/janedoe");
+    assert.strictEqual(model.personalInformation.portfolioUrl, "https://janedoe.dev");
+
+    // 2. Summary
+    assert.ok(model.summary && model.summary.includes("Experienced full-stack engineer"));
+
+    // 3. Skills (Array of objects)
+    assert.ok(Array.isArray(model.skills));
+    assert.ok(model.skills.length >= 8);
+    const react = model.skills.find((s) => s.name === "React");
+    assert.ok(react && react.category === "FRAMEWORK");
+
+    // 4. Education (Array of objects)
+    assert.ok(Array.isArray(model.education));
+    assert.strictEqual(model.education.length, 1);
+    assert.ok(model.education[0].qualification.includes("Bachelor of Science"));
+    assert.strictEqual(model.education[0].institution, "University of Colombo");
+    assert.strictEqual(model.education[0].startDate, "2015");
+    assert.strictEqual(model.education[0].endDate, "2019");
+
+    // 5. Experience (Array of objects)
+    assert.ok(Array.isArray(model.experience));
+    assert.ok(model.experience.length >= 2);
+    assert.strictEqual(model.experience[0].jobTitle, "Senior Software Engineer");
+    assert.strictEqual(model.experience[0].company, "Acme Cloud Solutions");
+    assert.strictEqual(model.experience[0].isCurrent, true);
+    assert.ok(Array.isArray(model.experience[0].responsibilities));
+
+    // 6. Projects (Array of objects)
+    assert.ok(Array.isArray(model.projects));
+    assert.ok(model.projects.length >= 1);
+    assert.strictEqual(model.projects[0].name, "SkillLens AI");
+    assert.strictEqual(model.projects[0].githubUrl, "https://github.com/janedoe/skilllens");
+    assert.ok(Array.isArray(model.projects[0].technologies));
+    assert.ok(model.projects[0].technologies.includes("React"));
+
+    // 7. Certifications (Array of objects)
+    assert.ok(Array.isArray(model.certifications));
+    assert.ok(model.certifications.length >= 1);
+    assert.ok(model.certifications[0].name.includes("AWS Certified Solutions Architect"));
+    assert.strictEqual(model.certifications[0].issuingOrganization, "AWS");
+
+    // Metadata
+    assert.strictEqual(model.parsingMetadata.status, "SUCCESS");
+    assert.strictEqual(model.parsingMetadata.parserVersion, "1.0");
+  });
+
+  // 17. Parse resume with NO summary
+  await testAsync("17. Parse resume with no summary defaults to null without fabricating text", async () => {
+    const resumeNoSummary = `John Smith\njohn.smith@example.com\n\nTECHNICAL SKILLS\nPython, Docker\n\nEDUCATION\nB.Sc in Computing\nStanford University\n2018 - 2022\n`;
+    const model = parseResume(resumeNoSummary, 10);
+    assert.strictEqual(model.summary, null);
+    assert.ok(model.parsingMetadata.warnings.some((w) => w.toLowerCase().includes("no summary")));
+  });
+
+  // 18. Parse resume with missing education or certification details
+  await testAsync("18. Gracefully handle missing education or certifications without failure", async () => {
+    const partialResume = `Sarah Connor\nsarah@sky.net\n\nWORK EXPERIENCE\nOperations Lead\nCyberdyne Systems\n2020 - Present\n- Managed infrastructure.\n`;
+    const model = parseResume(partialResume, 11);
+    assert.strictEqual(model.education.length, 0);
+    assert.strictEqual(model.certifications.length, 0);
+    assert.strictEqual(model.projects.length, 0);
+    assert.strictEqual(model.experience.length, 1);
+    assert.strictEqual(model.experience[0].jobTitle, "Operations Lead");
+    assert.strictEqual(model.parsingMetadata.status, "SUCCESS");
+  });
+
+  // 19. Multiple education entries
+  await testAsync("19. Parse multiple distinct education records with graduation dates", async () => {
+    const multiEdu = `Alice Wonder\nalice@example.com\n\nEDUCATION\nMaster of Science in Artificial Intelligence\nMIT\n2020 - 2022\n\nBachelor of Science in Computer Science\nHarvard University\n2016 - 2020\nGPA: 3.9 / 4.0\n`;
+    const model = parseResume(multiEdu);
+    assert.strictEqual(model.education.length, 2);
+    assert.ok(model.education[0].qualification.includes("Master of Science"));
+    assert.strictEqual(model.education[0].institution, "MIT");
+    assert.ok(model.education[1].qualification.includes("Bachelor of Science"));
+    assert.strictEqual(model.education[1].institution, "Harvard University");
+    assert.strictEqual(model.education[1].grade, "GPA: 3.9 / 4.0");
+  });
+
+  // 20. Multiple experience entries with current status & responsibilities
+  await testAsync("20. Parse multiple experience entries keeping responsibilities with correct employer", async () => {
+    const multiExp = `Bob Builder\nbob@example.com\n\nWORK EXPERIENCE\nPrincipal Architect\nMegaCorp\n2021 - Present\n- Designed enterprise cloud services.\n\nSenior Software Developer\nStartUp Labs\n2018 - 2021\n- Built customer dashboard using React and Node.js.\n`;
+    const model = parseResume(multiExp);
+    assert.strictEqual(model.experience.length, 2);
+    assert.strictEqual(model.experience[0].jobTitle, "Principal Architect");
+    assert.strictEqual(model.experience[0].company, "MegaCorp");
+    assert.strictEqual(model.experience[0].isCurrent, true);
+    assert.ok(model.experience[0].responsibilities[0].includes("cloud services"));
+
+    assert.strictEqual(model.experience[1].jobTitle, "Senior Software Developer");
+    assert.strictEqual(model.experience[1].company, "StartUp Labs");
+    assert.strictEqual(model.experience[1].isCurrent, false);
+    assert.ok(model.experience[1].responsibilities[0].includes("React and Node.js"));
+  });
+
+  // 21. Multiple projects and certifications
+  await testAsync("21. Parse multiple projects and certifications correctly", async () => {
+    const multiProjCert = `Carol Danvers\ncarol@example.com\n\nPROJECTS\nProject Alpha\nhttps://github.com/carol/alpha\nTechnologies: React, Node.js\n- High throughput engine.\n\nProject Beta\nhttps://beta.dev\n- Analytics reporting portal.\n\nCERTIFICATIONS\nAWS Certified Developer\nAmazon Web Services\n2022\n\nGoogle Cloud Professional Data Engineer\nGoogle Cloud\n2023\n`;
+    const model = parseResume(multiProjCert);
+    assert.strictEqual(model.projects.length, 2);
+    assert.strictEqual(model.projects[0].name, "Project Alpha");
+    assert.strictEqual(model.projects[0].githubUrl, "https://github.com/carol/alpha");
+    assert.strictEqual(model.projects[1].name, "Project Beta");
+
+    assert.strictEqual(model.certifications.length, 2);
+    assert.ok(model.certifications[0].name.includes("AWS Certified Developer"));
+    assert.ok(model.certifications[1].name.includes("Google Cloud Professional Data Engineer"));
+  });
+
+  // 22. Avoid obvious duplicate skills
+  await testAsync("22. Safely deduplicate skills without repeats", async () => {
+    const dupeSkillsResume = `Dev User\ndev@example.com\n\nTECHNICAL SKILLS\nReact, react, React.js, REACT, Python, python, Python3\n`;
+    const model = parseResume(dupeSkillsResume);
+    const reactCount = model.skills.filter((s) => s.name === "React").length;
+    const pythonCount = model.skills.filter((s) => s.name === "Python").length;
+    assert.strictEqual(reactCount, 1);
+    assert.strictEqual(pythonCount, 1);
+  });
+
+  // 23. Handle empty or corrupted extracted text
+  await testAsync("23. Handle empty or whitespace-only text safely", async () => {
+    const emptyModel = parseResume("   \n\n  \t  ");
+    assert.strictEqual(emptyModel.parsingMetadata.status, "EMPTY");
+    assert.strictEqual(emptyModel.skills.length, 0);
+    assert.strictEqual(emptyModel.education.length, 0);
+    assert.strictEqual(emptyModel.experience.length, 0);
+  });
+
+  // 24. Structured Resume Model Validator
+  await testAsync("24. Validate structured resume model against schema and data type invariants", async () => {
+    const validModel = createStructuredResumeModel(99);
+    const validCheck = validateStructuredResume(validModel);
+    assert.strictEqual(validCheck.isValid, true);
+
+    const malformedModel = {
+      personalInformation: { email: "bad-email-format" },
+      skills: "not-an-array",
+    };
+    const invalidCheck = validateStructuredResume(malformedModel);
+    assert.strictEqual(invalidCheck.isValid, false);
+    assert.ok(invalidCheck.warnings.length > 0);
+  });
+
+  // 25. Database persistence idempotency test (using real Aiven MySQL connection)
+  const db = require("../config/db");
+  const ResumeService = require("../services/resumeService");
+
+  await testAsync("25. Persist structured resume data to MySQL and verify idempotency on re-parse", async () => {
+    // Insert a test user
+    const [userRes] = await db.query(
+      `INSERT INTO users (full_name, email, password_hash)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)`,
+      ["Test User Day12", `day12_test_${Date.now()}@skilllens.local`, "mock_hash"]
+    );
+    const testUserId = userRes.insertId;
+
+    // Insert a test resume record
+    const [resRes] = await db.query(
+      `INSERT INTO resumes (user_id, original_filename, stored_filename, file_type, file_size, file_path, extracted_text, processing_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        testUserId,
+        "sample_day12.pdf",
+        "sample_day12.pdf",
+        "PDF",
+        1024,
+        "uploads/resumes/sample_day12.pdf",
+        SAMPLE_RESUME_TEXT,
+        "UPLOADED",
+      ]
+    );
+    const testResumeId = resRes.insertId;
+
+    try {
+      // 1st Parse run
+      const result1 = await ResumeService.parseStructuredResume(testResumeId, testUserId);
+      assert.strictEqual(result1.success, true);
+      assert.strictEqual(result1.status, "COMPLETED");
+
+      // Verify records in MySQL
+      const [secRows1] = await db.query(`SELECT id, section_type FROM resume_sections WHERE resume_id = ?`, [testResumeId]);
+      assert.ok(secRows1.length > 0);
+
+      const [skillRows1] = await db.query(`SELECT id, skill_id FROM resume_skills WHERE resume_id = ?`, [testResumeId]);
+      assert.ok(skillRows1.length > 0);
+
+      // 2nd Parse run (Idempotency check - must not duplicate rows)
+      const result2 = await ResumeService.parseStructuredResume(testResumeId, testUserId);
+      assert.strictEqual(result2.success, true);
+
+      const [secRows2] = await db.query(`SELECT id, section_type FROM resume_sections WHERE resume_id = ?`, [testResumeId]);
+      assert.strictEqual(secRows2.length, secRows1.length);
+
+      const [skillRows2] = await db.query(`SELECT id, skill_id FROM resume_skills WHERE resume_id = ?`, [testResumeId]);
+      assert.strictEqual(skillRows2.length, skillRows1.length);
+
+      // Verify retrieval returns structured data
+      const full = await ResumeService.getResumeWithExtraction(testResumeId, testUserId);
+      assert.ok(full.structuredModel);
+      assert.strictEqual(full.structuredModel.personalInformation.fullName, "Jane Doe");
+      assert.strictEqual(full.structuredModel.personalInformation.email, "jane.doe@example.com");
+      assert.ok(full.structuredModel.skills.length >= 8);
+    } finally {
+      // Clean up test records
+      await db.query(`DELETE FROM resumes WHERE id = ?`, [testResumeId]);
+      await db.query(`DELETE FROM users WHERE id = ?`, [testUserId]);
+    }
   });
 
   // Cleanup temp files

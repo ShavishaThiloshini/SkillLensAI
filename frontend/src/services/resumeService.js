@@ -56,10 +56,21 @@ export async function getResumeById(id) {
  * Triggers backend text extraction and section parsing for a stored resume.
  *
  * @param {number|string} id - Resume ID
- * @returns {Promise<{ success: boolean, resumeId: number, processing_status: string, message: string, structuredData?: Object }>}
+ * @returns {Promise<{ success: boolean, resumeId: number, processing_status: string, message: string, structuredData?: Object, structuredModel?: Object }>}
  */
 export async function extractResume(id) {
   const response = await api.post(`/resumes/${id}/extract`)
+  return response.data
+}
+
+/**
+ * Triggers backend structured resume parsing and normalization (Day 12).
+ *
+ * @param {number|string} id - Resume ID
+ * @returns {Promise<{ success: boolean, resumeId: number, processing_status: string, message: string, structuredModel: Object, warnings: string[] }>}
+ */
+export async function parseResume(id) {
+  const response = await api.post(`/resumes/${id}/parse`)
   return response.data
 }
 
@@ -68,5 +79,6 @@ export default {
   getResumes,
   getResumeById,
   extractResume,
+  parseResume,
 }
 
