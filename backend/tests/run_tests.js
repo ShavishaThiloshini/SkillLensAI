@@ -501,15 +501,215 @@ async function runTests() {
     }
   });
 
+  // Test 26: Test resume replacement with reset of extraction and file update
+  await testAsync("26. Replace resume updates document, resets extracted data, and preserves ID", async () => {
+    const db = require("../config/db");
+    const ResumeService = require("../services/resumeService");
+
+    // Create user
+    const [userRes] = await db.query(
+      `INSERT INTO users (full_name, email, password_hash) VALUES (?, ?, ?)`,
+      ["Test Replacer", `test_replacer_${Date.now()}@example.com`, "hash"]
+    );
+    const testUserId = userRes.insertId;
+
+    // Create original file
+    const oldFilePath = path.join(RESUMES_UPLOAD_DIR, `old_doc_${Date.now()}.docx`);
+    const oldBuffer = await createDocxWithText("Old resume text content");
+    fs.writeFileSync(oldFilePath, oldBuffer);
+
+    // Insert resume
+    const [resRes] = await db.query(
+      `INSERT INTO resumes (user_id, original_filename, stored_filename, file_type, file_size, file_path, extracted_text, processing_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        testUserId,
+        "old_resume.docx",
+        path.basename(oldFilePath),
+        "DOCX",
+        oldBuffer.length,
+        path.posix.join("uploads", "resumes", path.basename(oldFilePath)),
+        "Old extracted text",
+        "COMPLETED",
+      ]
+    );
+    const testResumeId = resRes.insertId;
+
+    // Insert a dummy section
+    await db.query(
+      `INSERT INTO resume_sections (resume_id, section_type, section_content) VALUES (?, 'SUMMARY', 'Old summary')`,
+      [testResumeId]
+    );
+
+    // Create replacement file
+    const newFilePath = path.join(RESUMES_UPLOAD_DIR, `new_doc_${Date.now()}.docx`);
+    const newBuffer = await createDocxWithText("New updated resume content");
+    fs.writeFileSync(newFilePath, newBuffer);
+
+    const mockNewFile = {
+      path: newFilePath,
+      originalname: "new_resume.docx",
+      filename: path.basename(newFilePath),
+    };
+
+    const mockValidation = {
+      fileType: "DOCX",
+      fileSize: newBuffer.length,
+    };
+
+    try {
+      const replaceResult = await ResumeService.replaceResume(
+        testResumeId,
+        testUserId,
+        mockNewFile,
+        mockValidation
+      );
+
+      assert.strictEqual(replaceResult.success, true);
+      assert.strictEqual(replaceResult.resume.id, testResumeId);
+      assert.strictEqual(replaceResult.resume.processing_status, "UPLOADED");
+
+      // Verify old file unlinked
+      assert.strictEqual(fs.existsSync(oldFilePath), false, "Old file should have been deleted");
+
+      // Verify sections cleaned up
+      const [secRows] = await db.query(
+        `SELECT id FROM resume_sections WHERE resume_id = ?`,
+        [testResumeId]
+      );
+      assert.strictEqual(secRows.length, 0, "Previous sections should be cleared");
+
+      // Verify resume in DB has reset extracted_text and updated filename
+      const [checkRows] = await db.query(
+        `SELECT original_filename, extracted_text, processing_status FROM resumes WHERE id = ?`,
+        [testResumeId]
+      );
+      assert.strictEqual(checkRows[0].original_filename, "new_resume.docx");
+      assert.strictEqual(checkRows[0].extracted_text, null);
+      assert.strictEqual(checkRows[0].processing_status, "UPLOADED");
+    } finally {
+      // Clean up
+      if (fs.existsSync(newFilePath)) {
+        try { fs.unlinkSync(newFilePath); } catch (_) {}
+      }
+      await db.query(`DELETE FROM resumes WHERE id = ?`, [testResumeId]);
+      await db.query(`DELETE FROM users WHERE id = ?`, [testUserId]);
+    }
+  });
+
+  // Test 27: Delete resume safely removes database records and disk file
+  await testAsync("27. Delete resume removes database records and physical file", async () => {
+    const db = require("../config/db");
+    const ResumeService = require("../services/resumeService");
+
+    const [userRes] = await db.query(
+      `INSERT INTO users (full_name, email, password_hash) VALUES (?, ?, ?)`,
+      ["Test Deleter", `test_deleter_${Date.now()}@example.com`, "hash"]
+    );
+    const testUserId = userRes.insertId;
+
+    const delFilePath = path.join(RESUMES_UPLOAD_DIR, `del_doc_${Date.now()}.docx`);
+    const delBuffer = await createDocxWithText("Document to be deleted");
+    fs.writeFileSync(delFilePath, delBuffer);
+
+    const [resRes] = await db.query(
+      `INSERT INTO resumes (user_id, original_filename, stored_filename, file_type, file_size, file_path, extracted_text, processing_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        testUserId,
+        "to_delete.docx",
+        path.basename(delFilePath),
+        "DOCX",
+        delBuffer.length,
+        path.posix.join("uploads", "resumes", path.basename(delFilePath)),
+        "Some text",
+        "COMPLETED",
+      ]
+    );
+    const testResumeId = resRes.insertId;
+
+    await db.query(
+      `INSERT INTO resume_sections (resume_id, section_type, section_content) VALUES (?, 'SUMMARY', 'Delete me')`,
+      [testResumeId]
+    );
+
+    try {
+      const deleteResult = await ResumeService.deleteResume(testResumeId, testUserId);
+      assert.strictEqual(deleteResult.success, true);
+
+      // Verify file deleted
+      assert.strictEqual(fs.existsSync(delFilePath), false, "File on disk should be removed");
+
+      // Verify DB record deleted
+      const [rows] = await db.query(`SELECT id FROM resumes WHERE id = ?`, [testResumeId]);
+      assert.strictEqual(rows.length, 0);
+
+      // Verify cascaded sections deleted
+      const [secRows] = await db.query(`SELECT id FROM resume_sections WHERE resume_id = ?`, [testResumeId]);
+      assert.strictEqual(secRows.length, 0);
+    } finally {
+      if (fs.existsSync(delFilePath)) {
+        try { fs.unlinkSync(delFilePath); } catch (_) {}
+      }
+      await db.query(`DELETE FROM resumes WHERE id = ?`, [testResumeId]);
+      await db.query(`DELETE FROM users WHERE id = ?`, [testUserId]);
+    }
+  });
+
+  // Test 28: Cross-user authorization check for delete and replace
+  await testAsync("28. Unauthorized user cannot delete or replace another user's resume", async () => {
+    const db = require("../config/db");
+    const ResumeService = require("../services/resumeService");
+
+    const [u1] = await db.query(
+      `INSERT INTO users (full_name, email, password_hash) VALUES (?, ?, ?)`,
+      ["User One", `u1_${Date.now()}@example.com`, "hash"]
+    );
+    const [u2] = await db.query(
+      `INSERT INTO users (full_name, email, password_hash) VALUES (?, ?, ?)`,
+      ["User Two", `u2_${Date.now()}@example.com`, "hash"]
+    );
+
+    const [resRes] = await db.query(
+      `INSERT INTO resumes (user_id, original_filename, stored_filename, file_type, file_size, file_path, processing_status)
+       VALUES (?, 'u1_doc.pdf', 'u1_doc.pdf', 'PDF', 100, 'uploads/resumes/dummy.pdf', 'UPLOADED')`,
+      [u1.insertId]
+    );
+    const resumeId = resRes.insertId;
+
+    try {
+      // User 2 attempts to delete User 1's resume
+      let deleteFailed = false;
+      try {
+        await ResumeService.deleteResume(resumeId, u2.insertId);
+      } catch (err) {
+        deleteFailed = true;
+        assert.ok(err.status === 404 || err.message.includes("access denied"));
+      }
+      assert.strictEqual(deleteFailed, true, "Unauthorized delete should be rejected");
+
+      // User 2 attempts to replace User 1's resume
+      let replaceFailed = false;
+      try {
+        await ResumeService.replaceResume(resumeId, u2.insertId, { originalname: "hack.pdf", filename: "hack.pdf", path: "fake" }, { fileType: "PDF", fileSize: 100 });
+      } catch (err) {
+        replaceFailed = true;
+        assert.ok(err.status === 404 || err.message.includes("access denied"));
+      }
+      assert.strictEqual(replaceFailed, true, "Unauthorized replace should be rejected");
+    } finally {
+      await db.query(`DELETE FROM resumes WHERE id = ?`, [resumeId]);
+      await db.query(`DELETE FROM users WHERE id IN (?, ?)`, [u1.insertId, u2.insertId]);
+    }
+  });
+
   // Cleanup temp files
   try {
     fs.rmSync(testDir, { recursive: true, force: true });
   } catch (_) {}
 
   console.log(`\nResults: ${passed} passed, ${failed} failed.`);
-  if (failed > 0) {
-    process.exit(1);
-  }
+  process.exit(failed > 0 ? 1 : 0);
 }
 
 runTests();

@@ -3,7 +3,7 @@ import AppLayout from './components/layout/AppLayout'
 import UIShowcase from './components/layout/Showcase'
 import Login from './pages/Login'
 import Register from './pages/Register'
-import Resume from './pages/Resume'
+import ResumeDashboard from './pages/ResumeDashboard'
 import { ProtectedRoute, PublicOnlyRoute } from './components/common/ProtectedRoute'
 import { useAuth } from './context/useAuth'
 
@@ -107,7 +107,7 @@ function App() {
         element={
           <ProtectedRoute>
             <AppLayout>
-              <Resume />
+              <ResumeDashboard />
             </AppLayout>
           </ProtectedRoute>
         }

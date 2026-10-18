@@ -301,11 +301,107 @@ async function parseResume(req, res) {
   }
 }
 
+/**
+ * DELETE /api/resumes/:id
+ * Deletes a resume owned by the authenticated user along with its physical file and extracted records.
+ */
+async function deleteResume(req, res) {
+  const userId = req.user?.id;
+  const resumeId = Number(req.params.id);
+
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      message: "Authentication required.",
+    });
+  }
+
+  if (!resumeId || Number.isNaN(resumeId)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid resume ID.",
+    });
+  }
+
+  try {
+    const result = await ResumeService.deleteResume(resumeId, userId);
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("[ResumeController] Delete error:", error.message);
+    const status = error.status || 500;
+    return res.status(status).json({
+      success: false,
+      message: error.message || "Failed to delete resume.",
+    });
+  }
+}
+
+/**
+ * PUT /api/resumes/:id/file
+ * Replaces an existing resume file for the authenticated user.
+ */
+async function replaceResume(req, res) {
+  const file = req.file;
+  const userId = req.user?.id;
+  const resumeId = Number(req.params.id);
+
+  if (!userId) {
+    cleanUpFile(file?.path);
+    return res.status(401).json({
+      success: false,
+      message: "Authentication required.",
+    });
+  }
+
+  if (!resumeId || Number.isNaN(resumeId)) {
+    cleanUpFile(file?.path);
+    return res.status(400).json({
+      success: false,
+      message: "Invalid resume ID.",
+    });
+  }
+
+  if (!file) {
+    return res.status(400).json({
+      success: false,
+      message: "No replacement resume file provided. Please attach a PDF or DOCX file under field 'resume'.",
+    });
+  }
+
+  const filePath = file.path;
+  const originalFilename = file.originalname || "resume";
+
+  // Validate new file
+  const validation = validateResumeFile(filePath, originalFilename);
+  if (!validation.isValid) {
+    cleanUpFile(filePath);
+    return res.status(400).json({
+      success: false,
+      message: validation.message || "File validation failed.",
+    });
+  }
+
+  try {
+    const result = await ResumeService.replaceResume(resumeId, userId, file, validation);
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("[ResumeController] Replace error:", error.message);
+    cleanUpFile(filePath);
+    const status = error.status || 500;
+    return res.status(status).json({
+      success: false,
+      message: error.message || "Failed to replace resume.",
+    });
+  }
+}
+
 module.exports = {
   uploadResume,
   getUserResumes,
   getResumeById,
   extractResume,
   parseResume,
+  deleteResume,
+  replaceResume,
 };
 

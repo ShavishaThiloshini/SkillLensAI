@@ -74,11 +74,50 @@ export async function parseResume(id) {
   return response.data
 }
 
+/**
+ * Deletes a resume owned by the current authenticated user.
+ *
+ * @param {number|string} id - Resume ID
+ * @returns {Promise<{ success: boolean, message: string }>}
+ */
+export async function deleteResume(id) {
+  const response = await api.delete(`/resumes/${id}`)
+  return response.data
+}
+
+/**
+ * Replaces an existing resume with a newly selected PDF or DOCX file.
+ *
+ * @param {number|string} id - Resume ID
+ * @param {File} file - Replacement file
+ * @param {Function} [onUploadProgress] - Optional progress callback
+ * @returns {Promise<{ success: boolean, message: string, resume: Object }>}
+ */
+export async function replaceResume(id, file, onUploadProgress) {
+  const formData = new FormData()
+  formData.append('resume', file)
+
+  const response = await api.put(`/resumes/${id}/file`, formData, {
+    onUploadProgress: (progressEvent) => {
+      if (onUploadProgress && progressEvent.total) {
+        const percentCompleted = Math.round(
+          (progressEvent.loaded * 100) / progressEvent.total
+        )
+        onUploadProgress(percentCompleted)
+      }
+    },
+  })
+
+  return response.data
+}
+
 export default {
   uploadResume,
   getResumes,
   getResumeById,
   extractResume,
   parseResume,
+  deleteResume,
+  replaceResume,
 }
 

@@ -500,6 +500,207 @@ class ResumeService {
       connection.release();
     }
   }
+
+  /**
+   * Deletes a resume owned by the authenticated user.
+   * Cleans up related sections, resume_skills, analyses, database records, and the uploaded disk file.
+   *
+   * @param {number} resumeId
+   * @param {number} userId
+   * @returns {Promise<{ success: boolean, message: string }>}
+   */
+  static async deleteResume(resumeId, userId) {
+    if (!resumeId || !userId) {
+      throw new Error("Resume ID and User ID are required.");
+    }
+
+    // 1. Fetch resume record and verify ownership
+    const [resumes] = await db.query(
+      `SELECT id, user_id, original_filename, stored_filename, file_path
+       FROM resumes
+       WHERE id = ? AND user_id = ?
+       LIMIT 1`,
+      [resumeId, userId]
+    );
+
+    if (!resumes || resumes.length === 0) {
+      const err = new Error("Resume not found or access denied.");
+      err.status = 404;
+      throw err;
+    }
+
+    const resume = resumes[0];
+    const absolutePath = path.resolve(__dirname, "..", resume.file_path);
+
+    // 2. Perform database deletion within transaction
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Delete resume_sections
+      await connection.query(
+        `DELETE FROM resume_sections WHERE resume_id = ?`,
+        [resumeId]
+      );
+
+      // Delete resume_skills (note: shared skills in `skills` catalogue are preserved)
+      await connection.query(
+        `DELETE FROM resume_skills WHERE resume_id = ?`,
+        [resumeId]
+      );
+
+      // Delete the resume record itself
+      const [deleteResult] = await connection.query(
+        `DELETE FROM resumes WHERE id = ? AND user_id = ?`,
+        [resumeId, userId]
+      );
+
+      if (deleteResult.affectedRows === 0) {
+        await connection.rollback();
+        const err = new Error("Resume could not be deleted.");
+        err.status = 404;
+        throw err;
+      }
+
+      await connection.commit();
+    } catch (dbError) {
+      await connection.rollback();
+      throw dbError;
+    } finally {
+      connection.release();
+    }
+
+    // 3. Remove physical file from disk safely after successful DB transaction
+    try {
+      if (fs.existsSync(absolutePath)) {
+        fs.unlinkSync(absolutePath);
+      }
+    } catch (fsError) {
+      console.warn("[ResumeService] Could not remove physical file after delete:", fsError.message);
+      // We do not fail the request since database record is deleted, but we log the warning
+    }
+
+    return {
+      success: true,
+      message: "Resume and associated extracted data deleted successfully.",
+    };
+  }
+
+  /**
+   * Replaces an existing resume with a newly uploaded file.
+   * Updates metadata, resets extracted text, resets processing_status to 'UPLOADED',
+   * cleans up previous sections and resume_skills, and replaces the stored file safely.
+   *
+   * @param {number} resumeId
+   * @param {number} userId
+   * @param {Object} newFile - Multer file object
+   * @param {Object} validation - Validation object from validateResumeFile
+   * @returns {Promise<{ success: boolean, message: string, resume: Object }>}
+   */
+  static async replaceResume(resumeId, userId, newFile, validation) {
+    if (!resumeId || !userId) {
+      throw new Error("Resume ID and User ID are required.");
+    }
+
+    // 1. Fetch current resume to verify ownership and find old file path
+    const [resumes] = await db.query(
+      `SELECT id, user_id, original_filename, stored_filename, file_path
+       FROM resumes
+       WHERE id = ? AND user_id = ?
+       LIMIT 1`,
+      [resumeId, userId]
+    );
+
+    if (!resumes || resumes.length === 0) {
+      const err = new Error("Resume not found or access denied.");
+      err.status = 404;
+      throw err;
+    }
+
+    const oldResume = resumes[0];
+    const oldAbsolutePath = path.resolve(__dirname, "..", oldResume.file_path);
+
+    const originalFilename = newFile.originalname || "resume";
+    const storedFilename = newFile.filename;
+    const relativePath = path.posix.join("uploads", "resumes", storedFilename);
+
+    // 2. Update database in transaction
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Clean up previous extracted sections
+      await connection.query(
+        `DELETE FROM resume_sections WHERE resume_id = ?`,
+        [resumeId]
+      );
+
+      // Clean up previous skills links for this resume
+      await connection.query(
+        `DELETE FROM resume_skills WHERE resume_id = ?`,
+        [resumeId]
+      );
+
+      // Update resume record with new file metadata, clear extracted_text, reset status
+      await connection.query(
+        `UPDATE resumes
+         SET original_filename = ?,
+             stored_filename = ?,
+             file_type = ?,
+             file_size = ?,
+             file_path = ?,
+             extracted_text = NULL,
+             processing_status = 'UPLOADED',
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND user_id = ?`,
+        [
+          originalFilename,
+          storedFilename,
+          validation.fileType,
+          validation.fileSize,
+          relativePath,
+          resumeId,
+          userId,
+        ]
+      );
+
+      await connection.commit();
+    } catch (dbError) {
+      await connection.rollback();
+      // Remove newly uploaded file since DB update failed
+      if (fs.existsSync(newFile.path)) {
+        try {
+          fs.unlinkSync(newFile.path);
+        } catch (_) {}
+      }
+      throw dbError;
+    } finally {
+      connection.release();
+    }
+
+    // 3. Remove old file from disk now that the database update and new file commit succeeded
+    if (oldAbsolutePath && fs.existsSync(oldAbsolutePath) && oldAbsolutePath !== path.resolve(newFile.path)) {
+      try {
+        fs.unlinkSync(oldAbsolutePath);
+      } catch (fsErr) {
+        console.warn("[ResumeService] Warning: Could not delete replaced file from disk:", fsErr.message);
+      }
+    }
+
+    return {
+      success: true,
+      message: "Resume replaced successfully. Previous extracted data was reset and new file is ready for processing.",
+      resume: {
+        id: resumeId,
+        original_filename: originalFilename,
+        file_type: validation.fileType,
+        file_size: validation.fileSize,
+        processing_status: "UPLOADED",
+        created_at: oldResume.created_at,
+        updated_at: new Date().toISOString(),
+      },
+    };
+  }
 }
 
 module.exports = ResumeService;

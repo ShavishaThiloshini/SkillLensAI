@@ -609,3 +609,229 @@
   }
 }
 
+/* Dashboard specific responsive cards */
+.dashboardControls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.searchBox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.4rem 0.75rem;
+  min-width: 240px;
+  max-width: 360px;
+  flex: 1;
+}
+
+.searchInput {
+  border: none;
+  outline: none;
+  background: transparent;
+  width: 100%;
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+}
+
+.searchInput::placeholder {
+  color: var(--color-text-muted);
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-4);
+}
+
+.resumeCard {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-4);
+  transition: all 0.2s ease-in-out;
+  position: relative;
+  box-shadow: var(--shadow-sm);
+}
+
+.resumeCard:hover {
+  border-color: var(--color-indigo-200);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.resumeCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.resumeCardDocInfo {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.resumeCardTitle {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--color-navy);
+  margin: 0;
+  word-break: break-word;
+  line-height: var(--leading-snug);
+}
+
+.resumeCardSubtitle {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.resumeCardBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.resumeMetaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.resumeMetaValue {
+  font-weight: var(--font-medium);
+  color: var(--color-text-primary);
+}
+
+.resumeCardActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.resumeActionGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* History list view */
+.historySection {
+  margin-top: var(--space-4);
+}
+
+.historyItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  gap: var(--space-3);
+}
+
+.historyItem:last-child {
+  border-bottom: none;
+}
+
+.historyItemInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.historyItemName {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-navy);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.historyItemDate {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* Confirmation modal content */
+.confirmModalContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  color: var(--color-text-primary);
+}
+
+.confirmWarningBox {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  background-color: var(--color-red-50);
+  border: 1px solid var(--color-red-100);
+  color: var(--color-red-dark);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+.confirmInfoRow {
+  background-color: var(--color-surface-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+}
+
+.replaceDropzone {
+  border: 2px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface-2);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.replaceDropzone:hover {
+  border-color: var(--color-indigo);
+  background-color: var(--color-indigo-50);
+}
+
+.paginationRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+

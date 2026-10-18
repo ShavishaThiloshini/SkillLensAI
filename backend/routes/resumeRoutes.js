@@ -7,6 +7,8 @@ const {
   getResumeById,
   extractResume,
   parseResume,
+  deleteResume,
+  replaceResume,
 } = require("../controllers/resumeController");
 const authenticateToken = require("../middleware/authMiddleware");
 const {
@@ -25,6 +27,12 @@ router.get("/", getUserResumes);
 
 // Retrieve metadata and extracted sections for a single resume owned by the user
 router.get("/:id", getResumeById);
+
+// Delete an owned resume and its extracted records and stored document
+router.delete("/:id", deleteResume);
+
+// Replace an existing resume file with validation, reset of previous extracts, and old file cleanup
+router.put("/:id/file", uploadMiddleware, handleUploadError, replaceResume);
 
 // Trigger text extraction and structured parsing for a stored resume
 router.post("/:id/extract", extractResume);
