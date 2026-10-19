@@ -12,42 +12,8 @@ const {
   parseCertifications,
   validateStructuredResume,
   normalizeDateRange,
+  SECTION_PATTERNS,
 } = require("../services/resumeParserService");
-
-/**
- * Standard section heading regular expressions.
- * Exported for compatibility with Day 11 tests.
- */
-const SECTION_PATTERNS = [
-  {
-    type: "SUMMARY",
-    pattern: /^(?:professional\s+summary|summary|profile|about\s+me|career\s+objective|objective|executive\s+summary|personal\s+profile)\b/i,
-  },
-  {
-    type: "EXPERIENCE",
-    pattern: /^(?:work\s+experience|professional\s+experience|experience|employment\s+history|work\s+history|career\s+history)\b/i,
-  },
-  {
-    type: "EDUCATION",
-    pattern: /^(?:education|academic\s+background|academic\s+qualifications|qualifications|academic\s+history)\b/i,
-  },
-  {
-    type: "SKILLS",
-    pattern: /^(?:technical\s+skills|core\s+competencies|skills\s*(?:&|and)\s*technologies|skills|technologies|proficiencies|tools\s*(?:&|and)\s*technologies)\b/i,
-  },
-  {
-    type: "PROJECTS",
-    pattern: /^(?:projects|personal\s+projects|key\s+projects|academic\s+projects|featured\s+projects)\b/i,
-  },
-  {
-    type: "CERTIFICATIONS",
-    pattern: /^(?:certifications|certificates|licenses\s*(?:&|and)\s*certifications|professional\s+certifications|credentials)\b/i,
-  },
-  {
-    type: "LANGUAGES",
-    pattern: /^(?:languages|language\s+proficiency)\b/i,
-  },
-];
 
 /**
  * Parses raw extracted resume text into structured sections and details.
@@ -123,6 +89,7 @@ function parseResumeText(rawText) {
     qualification: e.qualification,
     institution: e.institution || "Not detected",
     field_of_study: e.fieldOfStudy,
+    fieldOfStudy: e.fieldOfStudy,
     dates: e.startDate && e.endDate ? `${e.startDate} - ${e.endDate}` : (e.startDate || e.endDate || null),
     grade: e.grade,
     details: e.description,
@@ -131,6 +98,7 @@ function parseResumeText(rawText) {
   // Backward compatible experience list
   const experience = structuredModel.experience.map((e) => ({
     title: e.jobTitle,
+    jobTitle: e.jobTitle,
     company: e.company || "Not detected",
     dates: e.startDate && e.endDate ? `${e.startDate} - ${e.endDate}` : (e.startDate || e.endDate || "Not detected"),
     responsibilities: [...e.responsibilities, ...e.achievements].join(" ") || null,

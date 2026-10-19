@@ -6,27 +6,27 @@ const { extractSkills } = require("../utils/skillCatalogue");
 const SECTION_PATTERNS = [
   {
     type: "SUMMARY",
-    pattern: /^(?:professional\s+summary|summary|profile|about\s+me|career\s+objective|objective|executive\s+summary|personal\s+profile|personal\s+statement|professional\s+profile)\b/i,
+    pattern: /^(?:professional\s+summary|summary|profile|about\s+me|career\s+objective|objective|executive\s+summary|personal\s+profile|personal\s+statement|professional\s+profile|bio)\b/i,
   },
   {
     type: "EXPERIENCE",
-    pattern: /^(?:work\s+experience|professional\s+experience|experience|employment\s+history|work\s+history|career\s+history|relevant\s+experience|employment)\b/i,
+    pattern: /^(?:work\s*(?:&|and)\s*professional\s+experience|professional\s+experience|work\s+experience|experience|employment\s+history|work\s+history|career\s+history|relevant\s+experience|employment|professional\s+background)\b/i,
   },
   {
     type: "EDUCATION",
-    pattern: /^(?:education|academic\s+background|academic\s+qualifications|qualifications|academic\s+history|educational\s+background)\b/i,
+    pattern: /^(?:education\s*(?:&|and)\s*qualifications|academic\s+background|academic\s+qualifications|educational\s+background|qualifications|academic\s+history|education)\b/i,
   },
   {
     type: "SKILLS",
-    pattern: /^(?:technical\s+skills|core\s+competencies|skills\s*(?:&|and)\s*technologies|skills|technologies|proficiencies|tools\s*(?:&|and)\s*technologies|key\s+skills|competencies)\b/i,
+    pattern: /^(?:technical\s+competencies|core\s+competencies|technical\s+skills|skills\s*(?:&|and)\s*technologies|tools\s*(?:&|and)\s*technologies|skills|technologies|proficiencies|key\s+skills|competencies|areas\s+of\s+expertise)\b/i,
   },
   {
     type: "PROJECTS",
-    pattern: /^(?:projects|personal\s+projects|key\s+projects|academic\s+projects|featured\s+projects|technical\s+projects)\b/i,
+    pattern: /^(?:projects|personal\s+projects|key\s+projects|academic\s+projects|featured\s+projects|technical\s+projects|selected\s+projects)\b/i,
   },
   {
     type: "CERTIFICATIONS",
-    pattern: /^(?:certifications|certificates|licenses\s*(?:&|and)\s*certifications|professional\s+certifications|credentials|licenses)\b/i,
+    pattern: /^(?:professional\s+certifications|professional\s+certificates|certifications|certificates|licenses\s*(?:&|and)\s*certifications|credentials|licenses)\b/i,
   },
   {
     type: "LANGUAGES",
@@ -143,10 +143,15 @@ function segmentSections(lines) {
 
     // Detect if line looks like a major section heading
     // Ignore lines that begin with bullet symbols or contain items followed by a colon with content
-    const isBullet = /^[•\-*]/.test(line);
+    const isBullet = /^[•\-*▪●⁃◦‣\u2022\u2023\u25E6\u2043\u2219\u25CF\u25AA\u25AB]/.test(line);
     const hasColonContent = line.includes(":") && line.split(":")[1].trim().length > 0;
-    const isShort = line.length <= 45;
-    const cleanHeading = line.replace(/[:\-#*]/g, "").trim();
+    const isShort = line.length <= 50;
+    // Strip bullet chars, markdown headers, and numbering like "1. ", "II. "
+    const cleanHeading = line
+      .replace(/^[•\-*▪●⁃◦‣\u2022\u2023\u25E6\u2043\u2219\u25CF\u25AA\u25AB\s]+/, "")
+      .replace(/^(?:[0-9]+|[IVXLCDM]+)[\.\)\-\:\s]+/i, "")
+      .replace(/[:\-#*]/g, "")
+      .trim();
 
     let matchedType = null;
     if (!isBullet && !hasColonContent && isShort && cleanHeading.length >= 3) {
@@ -279,15 +284,43 @@ function parsePersonalInformation(allLines, headerContent, warnings = []) {
   }
 
   // 6. Full Name
-  // Heuristic: Candidate name is at the top of the resume, 2-4 words, alphabetic only,
+  // Heuristic: Candidate name is at the top of the resume in the header/preamble, 2-4 words, alphabetic only,
   // excluding contact keywords, titles, institutions, and section headers.
   let fullName = null;
-  const candidateLines = allLines.slice(0, 8);
-  for (const line of candidateLines) {
+  let candidateLines = [];
+  if (typeof headerContent === "string" && headerContent.trim()) {
+    candidateLines = headerContent.split("\n");
+  } else if (headerContent === null || headerContent === undefined) {
+    // If headerContent not supplied, scan allLines stopping at the first section heading
+    for (const l of allLines) {
+      const cleanHeading = l
+        .replace(/^[•\-*▪●⁃◦‣\u2022\u2023\u25E6\u2043\u2219\u25CF\u25AA\u25AB\s]+/, "")
+        .replace(/^(?:[0-9]+|[IVXLCDM]+)[\.\)\-\:\s]+/i, "")
+        .replace(/[:\-#*]/g, "")
+        .trim();
+      const isSec = SECTION_PATTERNS.some((def) => def.pattern.test(cleanHeading) || def.pattern.test(l.trim()));
+      if (isSec) break;
+      candidateLines.push(l);
+    }
+  }
+
+  for (const line of candidateLines.slice(0, 8)) {
     const clean = line.replace(/[•|,\-]/g, " ").trim();
     if (!clean) continue;
     if (clean.includes("@") || clean.includes("http") || clean.includes("www.") || /\d/.test(clean)) continue;
     if (/^(?:resume|curriculum\s+vitae|cv|page\s+\d|portfolio|contact|profile)/i.test(clean)) continue;
+    if (/^(?:software|senior|junior|lead|principal|staff|full\s+stack|frontend|backend|devops|data|cloud|mobile|web|cloud|qa|systems)\s+(?:engineer|developer|architect|specialist|analyst|consultant|manager|administrator)\b/i.test(clean)) continue;
+    if (/^(?:software\s+engineer|developer|architect|consultant|analyst|specialist|manager|director)\b/i.test(clean)) continue;
+
+    const cleanHeading = line
+      .replace(/^[•\-*▪●⁃◦‣\u2022\u2023\u25E6\u2043\u2219\u25CF\u25AA\u25AB\s]+/, "")
+      .replace(/^(?:[0-9]+|[IVXLCDM]+)[\.\)\-\:\s]+/i, "")
+      .replace(/[:\-#*]/g, "")
+      .trim();
+    const isSectionHeading = SECTION_PATTERNS.some(
+      (def) => def.pattern.test(cleanHeading) || def.pattern.test(clean) || def.pattern.test(line.trim())
+    );
+    if (isSectionHeading) continue;
 
     const words = clean.split(/\s+/).filter(Boolean);
     if (words.length >= 2 && words.length <= 4) {

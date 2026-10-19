@@ -61,8 +61,24 @@ async function extractDocumentText(absoluteFilePath, fileType) {
         };
       }
 
-      const pdfData = await pdfParse(dataBuffer);
-      const rawText = pdfData?.text || "";
+      let rawText = "";
+      if (typeof pdfParse === "function") {
+        const pdfData = await pdfParse(dataBuffer);
+        rawText = pdfData?.text || "";
+      } else if (pdfParse && typeof pdfParse.PDFParse === "function") {
+        const parser = new pdfParse.PDFParse({ data: dataBuffer });
+        try {
+          const result = await parser.getText({ pageJoiner: "" });
+          rawText = result?.text || "";
+        } finally {
+          try {
+            await parser.destroy();
+          } catch (_) {}
+        }
+      } else {
+        throw new Error("PDF parser library could not be initialized.");
+      }
+
       const cleaned = cleanExtractedText(rawText);
 
       if (!cleaned || cleaned.trim().length === 0) {

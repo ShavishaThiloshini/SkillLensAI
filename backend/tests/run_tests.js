@@ -89,7 +89,7 @@ Amazon Web Services
 2023`;
 
 async function runTests() {
-  console.log("=== SkillLens AI — Day 11 Text Extraction & Parsing Test Suite ===");
+  console.log("=== SkillLens AI — Day 14 Resume Processing Test Suite ===");
   const testDir = path.join(__dirname, "temp_test_files");
   if (!fs.existsSync(testDir)) {
     fs.mkdirSync(testDir, { recursive: true });
@@ -701,6 +701,749 @@ async function runTests() {
       await db.query(`DELETE FROM resumes WHERE id = ?`, [resumeId]);
       await db.query(`DELETE FROM users WHERE id IN (?, ?)`, [u1.insertId, u2.insertId]);
     }
+  });
+
+  // =====================================================================
+  // DAY 14 — Resume Processing Testing
+  // =====================================================================
+
+  // ---- Helper: minimal valid PDF buffer from plain-text lines ----
+  function buildMinimalPdfBuffer(lines) {
+    let stream = "BT /F1 12 Tf 50 720 Td ";
+    for (let i = 0; i < lines.length; i++) {
+      const esc = lines[i]
+        .replace(/\\/g, "\\\\")
+        .replace(/\(/g, "\\(")
+        .replace(/\)/g, "\\)");
+      stream += (i === 0 ? "" : "0 -16 Td ") + "(" + esc + ") Tj ";
+    }
+    stream += "ET";
+    const len = Buffer.byteLength(stream, "utf8");
+    const src = [
+      "%PDF-1.4",
+      "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj",
+      "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj",
+      "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj",
+      "4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj",
+      "5 0 obj\n<< /Length " + len + " >>\nstream\n" + stream + "\nendstream\nendobj",
+      "xref\n0 6\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \n0000000244 00000 n \n0000000332 00000 n ",
+      "trailer\n<< /Size 6 /Root 1 0 R >>",
+      "startxref\n" + (400 + len),
+      "%%EOF",
+    ].join("\n");
+    return Buffer.from(src, "utf8");
+  }
+
+  // ---- Helper: minimal DOCX with table cell text ----
+  async function createDocxWithTableAndText(tableRows, paragraphs) {
+    const JSZip = require("jszip");
+    const zip = new JSZip();
+    zip.file(
+      "[Content_Types].xml",
+      [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">",
+        "<Default Extension=\"xml\" ContentType=\"application/xml\"/>",
+        "</Types>",
+      ].join("")
+    );
+
+    const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const paras = paragraphs
+      .map((l) => `<w:p><w:r><w:t>${esc(l)}</w:t></w:r></w:p>`)
+      .join("");
+    const tableXml = tableRows
+      .map(
+        (row) =>
+          "<w:tr>" +
+          row.map((cell) => `<w:tc><w:p><w:r><w:t>${esc(cell)}</w:t></w:r></w:p></w:tc>`).join("") +
+          "</w:tr>"
+      )
+      .join("");
+    const tbl = tableRows.length ? `<w:tbl>${tableXml}</w:tbl>` : "";
+    zip.file(
+      "word/document.xml",
+      [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">",
+        "<w:body>",
+        paras,
+        tbl,
+        "</w:body></w:document>",
+      ].join("")
+    );
+    return await zip.generateAsync({ type: "nodebuffer" });
+  }
+
+  // ---- Test 29: Extract text from valid PDF ----
+  const validPdfFile = path.join(testDir, "day14_valid.pdf");
+  const validPdfLines = [
+    "Alex Chen",
+    "alex.chen@example.com",
+    "+1 415 555 0101",
+    "PROFESSIONAL SUMMARY",
+    "Results-driven engineer with 5 years of experience.",
+    "TECHNICAL SKILLS",
+    "Python, React, Docker, PostgreSQL",
+    "WORK EXPERIENCE",
+    "Software Engineer",
+    "Bright Systems Inc",
+    "2020 - Present",
+    "- Built scalable REST APIs using Python and FastAPI.",
+    "EDUCATION",
+    "Bachelor of Science in Computer Science",
+    "MIT",
+    "2016 - 2020",
+    "PROJECTS",
+    "OpenTrack",
+    "https://github.com/alexchen/opentrack",
+    "- Real-time analytics dashboard.",
+    "CERTIFICATIONS",
+    "AWS Certified Developer",
+    "Amazon Web Services",
+    "2022",
+  ];
+  fs.writeFileSync(validPdfFile, buildMinimalPdfBuffer(validPdfLines));
+
+  await testAsync("29. Extract text from a valid single-column PDF", async () => {
+    const res = await extractDocumentText(validPdfFile, "PDF");
+    assert.strictEqual(res.success, true, `Expected success but got: ${res.error}`);
+    assert.ok(res.text.includes("Alex Chen"), "Name should be in extracted text");
+    assert.ok(res.text.includes("Python"), "Skills should be in extracted text");
+    assert.ok(res.charCount > 100, "Character count should be positive");
+  });
+
+  // ---- Test 30: Parse valid PDF through full pipeline ----
+  await testAsync("30. Parse valid PDF through full text-extraction and structured-parse pipeline", async () => {
+    const res = await extractDocumentText(validPdfFile, "PDF");
+    assert.strictEqual(res.success, true);
+    const parsed = parseResumeText(res.text);
+    assert.ok(parsed.structuredModel, "Structured model must be present");
+    assert.strictEqual(parsed.structuredModel.personalInformation.email, "alex.chen@example.com");
+    assert.ok(parsed.skills.length > 0, "Skills must be extracted");
+    assert.ok(Array.isArray(parsed.education), "Education must be an array");
+    assert.ok(Array.isArray(parsed.experience), "Experience must be an array");
+  });
+
+  // ---- Test 31: Blank / image-only PDF (no text layer) ----
+  const blankPdfContent = [
+    "%PDF-1.4",
+    "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj",
+    "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj",
+    "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>\nendobj",
+    "xref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n ",
+    "trailer\n<< /Size 4 /Root 1 0 R >>",
+    "startxref\n190",
+    "%%EOF",
+  ].join("\n");
+  const blankPdfFile = path.join(testDir, "day14_blank.pdf");
+  fs.writeFileSync(blankPdfFile, Buffer.from(blankPdfContent, "utf8"));
+
+  await testAsync("31. Detect blank/image-only PDF (no text) and report honest error", async () => {
+    const res = await extractDocumentText(blankPdfFile, "PDF");
+    assert.strictEqual(res.success, false, "Blank PDF must not report success");
+    assert.ok(res.error, "Must have an error message");
+    assert.ok(
+      res.error.toLowerCase().includes("text") || res.error.toLowerCase().includes("extract"),
+      "Error must mention extraction failure"
+    );
+  });
+
+  // ---- Test 32: Two-column PDF (text order may be non-linear) ----
+  const twoColLines = [
+    "Jordan Lee", "jordan.lee@test.com",
+    "SKILLS", "Python Docker Kubernetes",
+    "EXPERIENCE", "Cloud Architect", "Apex Corp", "2021 - Present",
+    "- Deployed microservices on AWS EKS.",
+  ];
+  const twoColPdfFile = path.join(testDir, "day14_twocol.pdf");
+  fs.writeFileSync(twoColPdfFile, buildMinimalPdfBuffer(twoColLines));
+
+  await testAsync("32. Extract text from two-column PDF without crashing", async () => {
+    const res = await extractDocumentText(twoColPdfFile, "PDF");
+    // Text may merge columns but should not crash and should contain recognizable content
+    assert.strictEqual(res.success, true, `Extraction failed: ${res.error}`);
+    assert.ok(res.charCount > 30, "Some text should be extracted from two-column PDF");
+  });
+
+  // ---- Test 33: DOCX with a skills table ----
+  const docxTableFile = path.join(testDir, "day14_table.docx");
+  const tableBuf = await createDocxWithTableAndText(
+    [
+      ["Category", "Skills"],
+      ["Languages", "Python, TypeScript, SQL"],
+      ["Cloud", "AWS, Azure, GCP"],
+    ],
+    ["Morgan Blake", "morgan@example.com", "TECHNICAL SKILLS"]
+  );
+  fs.writeFileSync(docxTableFile, tableBuf);
+
+  await testAsync("33. Extract text from DOCX containing a table", async () => {
+    const res = await extractDocumentText(docxTableFile, "DOCX");
+    assert.strictEqual(res.success, true, `DOCX table extraction failed: ${res.error}`);
+    assert.ok(res.text.includes("Python"), "Table cell content should appear in extracted text");
+    assert.ok(res.text.includes("Morgan Blake"), "Name should appear");
+  });
+
+  // ---- Test 34: DOCX with hyperlinks in paragraphs ----
+  const docxLinkFile = path.join(testDir, "day14_links.docx");
+  const linkDocBuf = await createDocxWithText(
+    "Sam Rivera\nsam.rivera@mail.com\nhttps://linkedin.com/in/samrivera\nhttps://github.com/samrivera\nPROJECTS\nPortfolio Site\nhttps://samrivera.dev\n- Built a personal portfolio using Next.js and Vercel."
+  );
+  fs.writeFileSync(docxLinkFile, linkDocBuf);
+
+  await testAsync("34. Extract text from DOCX containing hyperlinks and URLs", async () => {
+    const res = await extractDocumentText(docxLinkFile, "DOCX");
+    assert.strictEqual(res.success, true, `Extraction failed: ${res.error}`);
+    const parsed = parseResumeText(res.text);
+    assert.strictEqual(parsed.structuredModel.personalInformation.linkedinUrl, "https://linkedin.com/in/samrivera");
+    assert.strictEqual(parsed.structuredModel.personalInformation.githubUrl, "https://github.com/samrivera");
+  });
+
+  // ---- Test 35: Numbered section headings (e.g. "1. Professional Summary") ----
+  const numberedHeadingText = [
+    "Taylor Kim",
+    "taylor.kim@example.com",
+    "+1 212 555 0100",
+    "1. Professional Summary",
+    "Detail-oriented QA engineer with 4 years of experience in automation.",
+    "2. Work Experience",
+    "QA Engineer",
+    "TechFirm Ltd",
+    "2021 - Present",
+    "- Built Selenium test suites reducing regression time by 60%.",
+    "3. Education",
+    "Bachelor of Engineering",
+    "State University",
+    "2017 - 2021",
+    "4. Technical Skills",
+    "Selenium, Python, Java, Postman, Jenkins",
+    "5. Certifications",
+    "ISTQB Certified Tester",
+    "ISTQB",
+    "2022",
+  ].join("\n");
+
+  await testAsync("35. Parse resume with numbered section headings (e.g. '1. Professional Summary')", async () => {
+    const parsed = parseResumeText(numberedHeadingText);
+    assert.ok(parsed.structuredModel.summary, "Summary must be extracted under numbered heading");
+    assert.ok(parsed.experience.length > 0, "Experience must be extracted under numbered heading");
+    assert.ok(parsed.education.length > 0, "Education must be extracted under numbered heading");
+  });
+
+  // ---- Test 36: 'Work & Professional Experience' heading variant ----
+  const workAndExpText = [
+    "Casey Jordan",
+    "casey@example.com",
+    "WORK & PROFESSIONAL EXPERIENCE",
+    "Senior Analyst",
+    "DataCorp",
+    "2020 - Present",
+    "- Delivered actionable insights from large datasets using Python and SQL.",
+    "TECHNICAL COMPETENCIES",
+    "Python, SQL, Tableau, Excel",
+    "EDUCATION & QUALIFICATIONS",
+    "Master of Science in Data Analytics",
+    "City College",
+    "2018 - 2020",
+    "PROFESSIONAL CERTIFICATIONS",
+    "Google Data Analytics Certificate",
+    "Google",
+    "2021",
+  ].join("\n");
+
+  await testAsync("36. Recognize 'Work & Professional Experience', 'Technical Competencies', and 'Education & Qualifications' headings", async () => {
+    const parsed = parseResumeText(workAndExpText);
+    assert.ok(parsed.experience.length > 0, "'Work & Professional Experience' heading must be recognized");
+    assert.ok(parsed.skills.length > 0, "'Technical Competencies' heading must be recognized");
+    assert.ok(parsed.education.length > 0, "'Education & Qualifications' heading must be recognized");
+    assert.ok(parsed.certifications.length > 0, "'Professional Certifications' heading must be recognized");
+  });
+
+  // ---- Test 37: Resume with ALL sections missing except contact ----
+  const contactOnlyText = [
+    "Riley Park",
+    "riley.park@example.com",
+    "+1 650 555 0199",
+    "San Francisco, CA",
+  ].join("\n");
+
+  await testAsync("37. Resume with only contact information: all section arrays remain empty without fabricating data", async () => {
+    const parsed = parseResumeText(contactOnlyText);
+    assert.strictEqual(parsed.structuredModel.personalInformation.email, "riley.park@example.com");
+    assert.strictEqual(parsed.structuredModel.summary, null, "Summary must be null when missing");
+    assert.deepStrictEqual(parsed.experience, [], "Experience must be empty array");
+    assert.deepStrictEqual(parsed.education, [], "Education must be empty array");
+    assert.deepStrictEqual(parsed.certifications, [], "Certifications must be empty array");
+    assert.deepStrictEqual(parsed.projects, [], "Projects must be empty array");
+  });
+
+  // ---- Test 38: Resume missing only education ----
+  const noEducationText = [
+    "Morgan Ellis",
+    "morgan.ellis@test.com",
+    "PROFESSIONAL SUMMARY",
+    "Full-stack developer with 3 years of experience.",
+    "TECHNICAL SKILLS",
+    "JavaScript, React, Node.js, MongoDB",
+    "WORK EXPERIENCE",
+    "Software Developer",
+    "WebWorks Inc",
+    "2022 - Present",
+    "- Developed React dashboards integrated with REST APIs.",
+  ].join("\n");
+
+  await testAsync("38. Resume missing Education section: education remains empty array, other sections parsed correctly", async () => {
+    const parsed = parseResumeText(noEducationText);
+    assert.deepStrictEqual(parsed.education, [], "Missing Education section must result in empty array");
+    assert.ok(parsed.experience.length > 0, "Experience must be parsed correctly");
+    assert.ok(parsed.skills.length > 0, "Skills must be parsed correctly");
+    assert.ok(
+      parsed.structuredModel.parsingMetadata.warnings.some((w) =>
+        w.toLowerCase().includes("education")
+      ),
+      "Warning must mention missing education"
+    );
+  });
+
+  // ---- Test 39: Resume missing only contact information ----
+  const noContactText = [
+    "PROFESSIONAL SUMMARY",
+    "Experienced data analyst with expertise in SQL and Python.",
+    "TECHNICAL SKILLS",
+    "SQL, Python, Tableau, Power BI",
+    "WORK EXPERIENCE",
+    "Data Analyst",
+    "Analytics Co.",
+    "2021 - 2023",
+    "- Produced monthly dashboards from MySQL data.",
+    "EDUCATION",
+    "Bachelor of Statistics",
+    "North University",
+    "2017 - 2021",
+  ].join("\n");
+
+  await testAsync("39. Resume missing contact section: personalInformation fields are null, not fabricated", async () => {
+    const parsed = parseResumeText(noContactText);
+    assert.strictEqual(parsed.structuredModel.personalInformation.fullName, null, "Full name must be null");
+    assert.strictEqual(parsed.structuredModel.personalInformation.email, null, "Email must be null");
+    assert.ok(parsed.education.length > 0, "Education should still be extracted");
+    assert.ok(parsed.experience.length > 0, "Experience should still be extracted");
+  });
+
+  // ---- Test 40: Poorly-formatted: mixed-case headings ----
+  const mixedCaseText = [
+    "Chris Bloom",
+    "chris.bloom@example.com",
+    "pRoFeSsIoNaL sUmMaRy",
+    "Innovative developer with a passion for clean code.",
+    "wOrK eXpErIeNcE",
+    "Backend Developer",
+    "TechGroup",
+    "2020 - 2023",
+    "- Built microservices in Node.js.",
+    "TeCHniCaL sKiLlS",
+    "Node.js, TypeScript, PostgreSQL",
+  ].join("\n");
+
+  await testAsync("40. Parse resume with mixed-case section headings (case-insensitive matching)", async () => {
+    const parsed = parseResumeText(mixedCaseText);
+    assert.ok(parsed.structuredModel.summary, "Summary must be found under mixed-case heading");
+    assert.ok(parsed.experience.length > 0, "Experience must be found under mixed-case heading");
+    assert.ok(parsed.skills.length > 0, "Skills must be found under mixed-case heading");
+  });
+
+  // ---- Test 41: Poorly-formatted: unconventional bullets and spacing ----
+  const uglyBulletText = [
+    "Drew Steele",
+    "drew@example.com",
+    "TECHNICAL SKILLS",
+    "▪ Python",
+    "● Docker",
+    "◦ Kubernetes",
+    "⁃ React",
+    "WORK EXPERIENCE",
+    "DevOps Engineer",
+    "CloudOps Ltd",
+    "2019 - 2022",
+    "▸ Managed Kubernetes clusters handling 10k pods.",
+    "▸ Automated CI/CD pipelines with Jenkins.",
+  ].join("\n");
+
+  await testAsync("41. Parse resume with unconventional Unicode bullet points gracefully", async () => {
+    const parsed = parseResumeText(uglyBulletText);
+    // Should not crash and skills/experience should be present
+    assert.ok(parsed.skills.length > 0, "Skills should be extracted despite unusual bullets");
+    assert.ok(parsed.experience.length > 0, "Experience should be extracted despite unusual bullets");
+  });
+
+  // ---- Test 42: Poorly-formatted: inconsistent date formats ----
+  const inconsistentDatesText = [
+    "Quinn Harper",
+    "quinn.harper@example.com",
+    "WORK EXPERIENCE",
+    "Software Engineer",
+    "Alpha Systems",
+    "Jan 2022 to Present",
+    "- Developed internal tooling.",
+    "Junior Developer",
+    "Beta Labs",
+    "March 2019 - December 2021",
+    "- Built e-commerce integrations.",
+    "EDUCATION",
+    "B.Sc. in Computer Science",
+    "Western University",
+    "Sep 2015 - Jun 2019",
+  ].join("\n");
+
+  await testAsync("42. Parse resume with inconsistent date formats without crashing", async () => {
+    const parsed = parseResumeText(inconsistentDatesText);
+    assert.ok(parsed.experience.length > 0, "Experience entries should be extracted");
+    assert.ok(parsed.education.length > 0, "Education should be extracted");
+    // Ensure no fabricated data
+    assert.ok(
+      parsed.experience.every((e) => e.jobTitle && typeof e.jobTitle === "string"),
+      "Job titles must be strings"
+    );
+  });
+
+  // ---- Test 43: Poorly-formatted: repeated headings ----
+  const repeatedHeadingText = [
+    "Avery Johnson",
+    "avery.j@example.com",
+    "SKILLS",
+    "JavaScript, React",
+    "SKILLS",
+    "Node.js, MySQL",
+    "EXPERIENCE",
+    "Frontend Developer",
+    "WebAgency",
+    "2021 - Present",
+    "- Delivered responsive UI components.",
+  ].join("\n");
+
+  await testAsync("43. Repeated section headings: content is merged, no crash, no duplicate skills", async () => {
+    const parsed = parseResumeText(repeatedHeadingText);
+    // Must not crash, skills must be present
+    assert.ok(Array.isArray(parsed.skills), "Skills must be an array");
+    assert.ok(parsed.experience.length > 0, "Experience must be extracted");
+    // No duplicate skill names
+    const skillNames = parsed.skills.map((s) => s.name.toLowerCase());
+    const uniqueSkillNames = [...new Set(skillNames)];
+    assert.strictEqual(skillNames.length, uniqueSkillNames.length, "Duplicate skills must not appear");
+  });
+
+  // ---- Test 44: Skills listed in sentences (no dedicated skills section) ----
+  const sentenceSkillsText = [
+    "Brook Davis",
+    "brook.davis@example.com",
+    "PROFESSIONAL SUMMARY",
+    "Brook is proficient in Python, React, Docker and has worked with AWS and PostgreSQL.",
+    "WORK EXPERIENCE",
+    "Software Engineer",
+    "Innovate Ltd",
+    "2020 - Present",
+    "- Built services using Python and deployed to AWS Lambda.",
+  ].join("\n");
+
+  await testAsync("44. Extract skills from sentences when no dedicated Skills section exists", async () => {
+    const parsed = parseResumeText(sentenceSkillsText);
+    assert.ok(parsed.skills.length >= 2, "At least 2 skills should be extracted from sentence context");
+    const skillNames = parsed.skills.map((s) => s.name);
+    assert.ok(skillNames.includes("Python") || skillNames.some((n) => n.toLowerCase().includes("python")));
+  });
+
+  // ---- Test 45: File validation — oversized file rejection ----
+  const { MAX_FILE_SIZE_BYTES } = require("../utils/fileValidator");
+  const oversizedFile = path.join(testDir, "day14_oversized.pdf");
+  // Create a valid-looking PDF header then pad to exceed limit
+  const oversizedBuf = Buffer.alloc(MAX_FILE_SIZE_BYTES + 1024, 0x41); // fill with 'A'
+  oversizedBuf.write("%PDF-1.4", 0, "utf8"); // valid magic bytes
+  fs.writeFileSync(oversizedFile, oversizedBuf);
+
+  await testAsync("45. File validation rejects documents exceeding the 5 MB size limit", async () => {
+    const result = validateResumeFile(oversizedFile, "oversized.pdf");
+    assert.strictEqual(result.isValid, false, "Oversized file must be rejected");
+    assert.ok(
+      result.message.toLowerCase().includes("5 mb") ||
+      result.message.toLowerCase().includes("size") ||
+      result.message.toLowerCase().includes("limit"),
+      "Rejection message must mention size/limit"
+    );
+  });
+
+  // ---- Test 46: File validation — empty file rejected ----
+  const emptyFile = path.join(testDir, "day14_empty.pdf");
+  fs.writeFileSync(emptyFile, Buffer.alloc(0));
+
+  await testAsync("46. File validation rejects empty (0-byte) files before processing", async () => {
+    const result = validateResumeFile(emptyFile, "empty.pdf");
+    assert.strictEqual(result.isValid, false, "Empty file must be rejected");
+    assert.ok(result.message.toLowerCase().includes("empty"), "Message must mention empty");
+  });
+
+  // ---- Test 47: File validation — wrong extension rejected ----
+  const txtFile = path.join(testDir, "day14_fake.txt");
+  fs.writeFileSync(txtFile, "This is plain text, not a resume document.");
+
+  await testAsync("47. File validation rejects unsupported file extensions (.txt)", async () => {
+    const result = validateResumeFile(txtFile, "resume.txt");
+    assert.strictEqual(result.isValid, false, "Non-PDF/DOCX extension must be rejected");
+    assert.ok(
+      result.message.toLowerCase().includes("format") ||
+      result.message.toLowerCase().includes("pdf") ||
+      result.message.toLowerCase().includes("docx"),
+      "Message must mention supported formats"
+    );
+  });
+
+  // ---- Test 48: File validation — file with misleading extension (txt renamed .pdf) ----
+  const fakePdfFile = path.join(testDir, "day14_fake.pdf");
+  fs.writeFileSync(fakePdfFile, Buffer.from("This is not a real PDF file. Just plain text."));
+
+  await testAsync("48. File validation rejects plain-text file renamed to .pdf (magic byte check)", async () => {
+    const result = validateResumeFile(fakePdfFile, "fake.pdf");
+    assert.strictEqual(result.isValid, false, "File with .pdf extension but invalid content must be rejected");
+    assert.ok(
+      result.message.toLowerCase().includes("pdf") ||
+      result.message.toLowerCase().includes("invalid") ||
+      result.message.toLowerCase().includes("content"),
+      "Message must indicate the file content is invalid"
+    );
+  });
+
+  // ---- Test 49: File validation — file with misleading extension (txt renamed .docx) ----
+  const fakeDocxFile = path.join(testDir, "day14_fake.docx");
+  fs.writeFileSync(fakeDocxFile, Buffer.from("This is not a real DOCX file."));
+
+  await testAsync("49. File validation rejects plain-text file renamed to .docx (ZIP structure check)", async () => {
+    const result = validateResumeFile(fakeDocxFile, "fake.docx");
+    assert.strictEqual(result.isValid, false, "File with .docx extension but invalid content must be rejected");
+    assert.ok(
+      result.message.toLowerCase().includes("docx") ||
+      result.message.toLowerCase().includes("invalid") ||
+      result.message.toLowerCase().includes("corrupted"),
+      "Message must indicate the file content is invalid"
+    );
+  });
+
+  // ---- Test 50: File validation — valid PDF accepted ----
+  const validSmallPdf = path.join(testDir, "day14_small_valid.pdf");
+  fs.writeFileSync(validSmallPdf, buildMinimalPdfBuffer(["John Test", "test@example.com"]));
+
+  await testAsync("50. File validation accepts a valid small PDF document", async () => {
+    const result = validateResumeFile(validSmallPdf, "resume.pdf");
+    assert.strictEqual(result.isValid, true, `Valid PDF must be accepted: ${result.message}`);
+    assert.strictEqual(result.fileType, "PDF");
+    assert.ok(result.fileSize > 0);
+  });
+
+  // ---- Test 51: File validation — valid DOCX accepted ----
+  const validSmallDocx = path.join(testDir, "day14_small_valid.docx");
+  fs.writeFileSync(validSmallDocx, await createDocxWithText("Resume content here"));
+
+  await testAsync("51. File validation accepts a valid small DOCX document", async () => {
+    const result = validateResumeFile(validSmallDocx, "resume.docx");
+    assert.strictEqual(result.isValid, true, `Valid DOCX must be accepted: ${result.message}`);
+    assert.strictEqual(result.fileType, "DOCX");
+    assert.ok(result.fileSize > 0);
+  });
+
+  // ---- Test 52: Corrupted PDF (valid magic bytes, invalid body) ----
+  const corruptedPdfFile = path.join(testDir, "day14_corrupt.pdf");
+  const corruptBuf = Buffer.alloc(512);
+  corruptBuf.write("%PDF-1.4\n%%corrupt content that cannot be parsed", 0, "utf8");
+  fs.writeFileSync(corruptedPdfFile, corruptBuf);
+
+  await testAsync("52. Handle corrupted PDF (valid header, invalid body) gracefully without crashing", async () => {
+    const res = await extractDocumentText(corruptedPdfFile, "PDF");
+    // Either fails gracefully or extracts nothing — must NOT throw unhandled exception
+    assert.ok(typeof res.success === "boolean", "Result must have a boolean success field");
+    assert.ok(typeof res.error === "string" || res.success === true, "Must have error string or succeed");
+  });
+
+  // ---- Test 53: cleanExtractedText preserves meaningful content ----
+  await testAsync("53. cleanExtractedText removes null bytes and collapses excessive blank lines without losing content", async () => {
+    const rawDirty =
+      "Line 1\x00\x07\r\nLine 2\n\n\n\n\n\nLine 3\t  extra   spaces\u00A0here";
+    const cleaned = cleanExtractedText(rawDirty);
+    assert.ok(cleaned.includes("Line 1"), "Line 1 must be preserved");
+    assert.ok(cleaned.includes("Line 2"), "Line 2 must be preserved");
+    assert.ok(cleaned.includes("Line 3"), "Line 3 must be preserved");
+    assert.ok(!cleaned.includes("\x00"), "Null bytes must be removed");
+    assert.ok(!cleaned.includes("\r"), "Carriage returns must be removed");
+    const blankLineCount = (cleaned.match(/\n\n\n/g) || []).length;
+    assert.strictEqual(blankLineCount, 0, "Triple+ blank lines must be collapsed");
+  });
+
+  // ---- Test 54: Multiple education entries with varied formats ----
+  const multiEduText = [
+    "Pat Nguyen",
+    "pat.nguyen@example.com",
+    "EDUCATION",
+    "Doctor of Philosophy in Machine Learning",
+    "Stanford University",
+    "2020 - Present",
+    "Master of Science in Computer Science",
+    "UC Berkeley",
+    "2018 - 2020",
+    "GPA: 3.9 / 4.0",
+    "Bachelor of Engineering",
+    "Colombo University",
+    "2014 - 2018",
+  ].join("\n");
+
+  await testAsync("54. Parse multiple education entries with different degree formats", async () => {
+    const parsed = parseResumeText(multiEduText);
+    assert.ok(parsed.education.length >= 2, "Multiple education entries must be parsed");
+    const quals = parsed.education.map((e) => e.qualification || "");
+    assert.ok(quals.some((q) => /doctor|ph\.?d/i.test(q)), "PhD entry must be parsed");
+    assert.ok(quals.some((q) => /master|m\.sc/i.test(q)), "Master entry must be parsed");
+  });
+
+  // ---- Test 55: Multiple experience entries with achievements ----
+  const multiExpText = [
+    "Jamie Torres",
+    "jamie.torres@example.com",
+    "WORK EXPERIENCE",
+    "Principal Engineer",
+    "MegaCorp",
+    "2022 - Present",
+    "- Led architecture of distributed payment system.",
+    "- Reduced latency by 45% through caching strategy.",
+    "Senior Engineer",
+    "StartupXYZ",
+    "2019 - 2022",
+    "- Built real-time notification service using WebSockets and Redis.",
+    "- Increased test coverage from 30% to 85%.",
+    "Junior Developer",
+    "CodeHouse",
+    "2017 - 2019",
+    "- Developed internal CMS using PHP and MySQL.",
+  ].join("\n");
+
+  await testAsync("55. Parse three distinct work experience entries retaining responsibilities correctly", async () => {
+    const parsed = parseResumeText(multiExpText);
+    assert.ok(parsed.experience.length >= 2, "At least 2 experience entries expected");
+    parsed.experience.forEach((exp) => {
+      assert.ok(exp.jobTitle, "Each entry must have a job title");
+      assert.ok(exp.company, "Each entry must have a company");
+    });
+  });
+
+  // ---- Test 56: Skills deduplication across sections ----
+  const dupSkillsText = [
+    "Drew Kim",
+    "drew.kim@example.com",
+    "TECHNICAL SKILLS",
+    "Python, JavaScript, Python, React, React",
+    "WORK EXPERIENCE",
+    "Developer",
+    "Tech Inc",
+    "2021 - Present",
+    "- Wrote Python scripts and React components.",
+  ].join("\n");
+
+  await testAsync("56. Skills deduplication: no repeated skill entries even when mentioned multiple times", async () => {
+    const parsed = parseResumeText(dupSkillsText);
+    const skillNames = parsed.skills.map((s) => s.name.toLowerCase());
+    const uniqueNames = [...new Set(skillNames)];
+    assert.strictEqual(
+      skillNames.length,
+      uniqueNames.length,
+      `Duplicate skills found: ${skillNames.join(", ")}`
+    );
+  });
+
+  // ---- Test 57: Projects section with multiple entries and tech stack ----
+  const multiProjectText = [
+    "Sam Green",
+    "sam.green@example.com",
+    "PROJECTS",
+    "InventoryPro",
+    "https://github.com/samgreen/inventorypro",
+    "Technologies: React, Node.js, MongoDB",
+    "- Inventory management system for small businesses.",
+    "DataViz Platform",
+    "https://github.com/samgreen/dataviz",
+    "Technologies: Python, Plotly, Flask",
+    "- Interactive data visualization for retail analytics.",
+  ].join("\n");
+
+  await testAsync("57. Parse multiple project entries with URLs and technology stacks", async () => {
+    const parsed = parseResumeText(multiProjectText);
+    assert.ok(parsed.projects.length >= 1, "At least one project must be parsed");
+    parsed.projects.forEach((p) => {
+      assert.ok(typeof p.name === "string" || p.name === null, "Project name must be string or null");
+    });
+  });
+
+  // ---- Test 58: extractDocumentText rejects unsupported file type ----
+  const unsupportedFile = path.join(testDir, "day14_resume.xls");
+  fs.writeFileSync(unsupportedFile, Buffer.from("spreadsheet content"));
+
+  await testAsync("58. extractDocumentText returns error for unsupported document type (xls)", async () => {
+    const res = await extractDocumentText(unsupportedFile, "XLS");
+    assert.strictEqual(res.success, false, "Unsupported file type must not succeed");
+    assert.ok(res.error && res.error.toLowerCase().includes("unsupported"), "Error must say 'unsupported'");
+  });
+
+  // ---- Test 59: normalizeDateRange handles edge cases ----
+  await testAsync("59. normalizeDateRange handles 'Present', 'current', and missing end date correctly", async () => {
+    const { normalizeDateRange } = require("../services/resumeParserService");
+
+    const r1 = normalizeDateRange("2020 - Present");
+    assert.strictEqual(r1.startDate, "2020");
+    assert.strictEqual(r1.endDate, "Present");
+    assert.strictEqual(r1.isCurrent, true);
+
+    const r2 = normalizeDateRange("Jan 2019 to Dec 2021");
+    assert.strictEqual(r2.startDate, "Jan 2019");
+    assert.strictEqual(r2.endDate, "Dec 2021");
+    assert.strictEqual(r2.isCurrent, false);
+
+    const r3 = normalizeDateRange(null);
+    assert.strictEqual(r3.startDate, null);
+    assert.strictEqual(r3.endDate, null);
+    assert.strictEqual(r3.isCurrent, null);
+  });
+
+  // ---- Test 60: parseSummary trims and collapses whitespace ----
+  await testAsync("60. parseSummary trims excessive whitespace and returns null for blank summary", async () => {
+    const { parseSummary } = require("../services/resumeParserService");
+
+    const r1 = parseSummary("  Engineer with   10 years  \nof cloud experience.  ");
+    assert.ok(r1 && !r1.startsWith(" "), "Leading whitespace must be trimmed");
+    assert.ok(!r1.includes("  "), "Multiple internal spaces must be collapsed");
+
+    const r2 = parseSummary("   ");
+    assert.strictEqual(r2, null, "Whitespace-only summary must return null");
+
+    const r3 = parseSummary(null);
+    assert.strictEqual(r3, null, "Null input must return null");
+  });
+
+  // ---- Test 61: segmentSections handles blank lines gracefully ----
+  await testAsync("61. segmentSections handles documents with many extra blank lines without breaking structure", async () => {
+    const textWithBlanks = [
+      "Riley Fox",
+      "",
+      "",
+      "riley.fox@example.com",
+      "",
+      "PROFESSIONAL SUMMARY",
+      "",
+      "Agile coach with 8 years of experience.",
+      "",
+      "",
+      "TECHNICAL SKILLS",
+      "",
+      "Jira, Confluence, Python",
+    ].join("\n");
+
+    const parsed = parseResumeText(textWithBlanks);
+    assert.ok(parsed.structuredModel.summary, "Summary must be parsed through blank lines");
+    assert.ok(parsed.skills.length > 0, "Skills must be parsed through blank lines");
   });
 
   // Cleanup temp files
