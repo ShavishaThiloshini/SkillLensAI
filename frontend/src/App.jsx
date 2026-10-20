@@ -4,6 +4,7 @@ import UIShowcase from './components/layout/Showcase'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import ResumeDashboard from './pages/ResumeDashboard'
+import JobDescriptions from './pages/JobDescriptions'
 import { ProtectedRoute, PublicOnlyRoute } from './components/common/ProtectedRoute'
 import { useAuth } from './context/useAuth'
 
@@ -117,7 +118,7 @@ function App() {
         element={
           <ProtectedRoute>
             <AppLayout>
-              <PlaceholderPage title="Job Descriptions" />
+              <JobDescriptions />
             </AppLayout>
           </ProtectedRoute>
         }

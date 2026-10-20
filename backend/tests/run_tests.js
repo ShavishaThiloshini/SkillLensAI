@@ -98,6 +98,9 @@ async function runTests() {
   let passed = 0;
   let failed = 0;
 
+  const { initDb } = require("../database/initDb");
+  await initDb();
+
   async function testAsync(name, fn) {
     try {
       await fn();
@@ -1444,6 +1447,312 @@ async function runTests() {
     const parsed = parseResumeText(textWithBlanks);
     assert.ok(parsed.structuredModel.summary, "Summary must be parsed through blank lines");
     assert.ok(parsed.skills.length > 0, "Skills must be parsed through blank lines");
+  });
+
+  // =========================================================================
+  // Day 15: Job Description Input Test Suite
+  // =========================================================================
+
+  function createMockRes() {
+    return {
+      statusCode: 200,
+      body: null,
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      json(data) {
+        this.body = data;
+        return this;
+      },
+    };
+  }
+
+  const {
+    createJobDescription,
+    uploadJobDescription,
+    getJobDescriptions,
+    getJobDescriptionById,
+    MAX_DESCRIPTION_LENGTH,
+  } = require("../controllers/jobController");
+  const { JOB_UPLOAD_DIR } = require("../middleware/jobUploadMiddleware");
+
+  // ---- Test 62: Create job description via pasted text ----
+  await testAsync("62. Create job description via pasted text persists to MySQL with PASTED_TEXT source", async () => {
+    // Create test user
+    const [userRes] = await db.query(
+      `INSERT INTO users (full_name, email, password_hash) VALUES (?, ?, ?)`,
+      ["Job Tester", `job_tester_${Date.now()}@example.com`, "hash"]
+    );
+    const testUserId = userRes.insertId;
+
+    const req = {
+      user: { id: testUserId },
+      body: {
+        title: "Senior Full Stack Engineer",
+        company: "Acme Corp",
+        description: "We are looking for a Senior Full Stack Engineer with React, Node.js, and MySQL experience.",
+      },
+    };
+    const res = createMockRes();
+
+    try {
+      await createJobDescription(req, res);
+      assert.strictEqual(res.statusCode, 201);
+      assert.strictEqual(res.body.success, true);
+      assert.strictEqual(res.body.job.title, "Senior Full Stack Engineer");
+      assert.strictEqual(res.body.job.company, "Acme Corp");
+      assert.strictEqual(res.body.job.source_type, "PASTED_TEXT");
+      assert.strictEqual(res.body.job.processing_status, "COMPLETED");
+
+      // Verify in DB
+      const [rows] = await db.query(`SELECT * FROM jobs WHERE id = ?`, [res.body.job.id]);
+      assert.strictEqual(rows.length, 1);
+      assert.strictEqual(rows[0].user_id, testUserId);
+    } finally {
+      await db.query(`DELETE FROM users WHERE id = ?`, [testUserId]);
+    }
+  });
+
+  // ---- Test 63: Validate required title on pasted text ----
+  await testAsync("63. Create job description validates required title", async () => {
+    const req = {
+      user: { id: 999 },
+      body: {
+        title: "   ",
+        description: "Some valid job description text here.",
+      },
+    };
+    const res = createMockRes();
+
+    await createJobDescription(req, res);
+    assert.strictEqual(res.statusCode, 400);
+    assert.strictEqual(res.body.success, false);
+    assert.ok(res.body.message.includes("title"));
+  });
+
+  // ---- Test 64: Validate required description text ----
+  await testAsync("64. Create job description validates required description text", async () => {
+    const req = {
+      user: { id: 999 },
+      body: {
+        title: "Backend Developer",
+        description: "",
+      },
+    };
+    const res = createMockRes();
+
+    await createJobDescription(req, res);
+    assert.strictEqual(res.statusCode, 400);
+    assert.strictEqual(res.body.success, false);
+    assert.ok(res.body.message.includes("description"));
+  });
+
+  // ---- Test 65: Validate description length limit ----
+  await testAsync("65. Create job description rejects text exceeding 30,000 character limit", async () => {
+    const oversizedText = "x".repeat(MAX_DESCRIPTION_LENGTH + 1);
+    const req = {
+      user: { id: 999 },
+      body: {
+        title: "Cloud Architect",
+        description: oversizedText,
+      },
+    };
+    const res = createMockRes();
+
+    await createJobDescription(req, res);
+    assert.strictEqual(res.statusCode, 400);
+    assert.strictEqual(res.body.success, false);
+    assert.ok(res.body.message.includes("must not exceed"));
+  });
+
+  // ---- Test 66: Upload job description document (DOCX), extract text, and clean up temp file ----
+  await testAsync("66. Upload job description document extracts text, saves as UPLOADED_FILE, and removes temp file", async () => {
+    const [userRes] = await db.query(
+      `INSERT INTO users (full_name, email, password_hash) VALUES (?, ?, ?)`,
+      ["Docx Tester", `docx_job_${Date.now()}@example.com`, "hash"]
+    );
+    const testUserId = userRes.insertId;
+
+    const sampleDocxText = "Software Engineer Job Opening\nResponsibilities:\n- Build microservices\n- Write unit tests";
+    const docxBuffer = await createDocxWithText(sampleDocxText);
+
+    const tempUploadPath = path.join(JOB_UPLOAD_DIR, `test_job_${Date.now()}.docx`);
+    fs.writeFileSync(tempUploadPath, docxBuffer);
+
+    const req = {
+      user: { id: testUserId },
+      file: {
+        path: tempUploadPath,
+        originalname: "senior_role.docx",
+      },
+      body: {
+        title: "Staff Software Engineer",
+        company: "InnovateTech",
+      },
+    };
+    const res = createMockRes();
+
+    try {
+      await uploadJobDescription(req, res);
+      assert.strictEqual(res.statusCode, 201);
+      assert.strictEqual(res.body.success, true);
+      assert.strictEqual(res.body.job.source_type, "UPLOADED_FILE");
+      assert.strictEqual(res.body.job.title, "Staff Software Engineer");
+      assert.strictEqual(res.body.job.company, "InnovateTech");
+      assert.ok(res.body.job.description.includes("Build microservices"));
+
+      // Verify temp file is cleaned up after extraction
+      assert.strictEqual(fs.existsSync(tempUploadPath), false, "Temporary upload file must be unlinked");
+    } finally {
+      if (fs.existsSync(tempUploadPath)) {
+        try { fs.unlinkSync(tempUploadPath); } catch (_) {}
+      }
+      await db.query(`DELETE FROM users WHERE id = ?`, [testUserId]);
+    }
+  });
+
+  // ---- Test 67: Upload rejects unsupported file type and cleans up ----
+  await testAsync("67. Upload job description rejects invalid file formats and unlinks temp file", async () => {
+    const fakeFilePath = path.join(JOB_UPLOAD_DIR, `fake_${Date.now()}.txt`);
+    fs.writeFileSync(fakeFilePath, "This is not a PDF or DOCX");
+
+    const req = {
+      user: { id: 999 },
+      file: {
+        path: fakeFilePath,
+        originalname: "fake_job.txt",
+      },
+      body: {
+        title: "Frontend Developer",
+      },
+    };
+    const res = createMockRes();
+
+    try {
+      await uploadJobDescription(req, res);
+      assert.strictEqual(res.statusCode, 400);
+      assert.strictEqual(res.body.success, false);
+      assert.strictEqual(fs.existsSync(fakeFilePath), false, "Invalid file should be unlinked");
+    } finally {
+      if (fs.existsSync(fakeFilePath)) {
+        try { fs.unlinkSync(fakeFilePath); } catch (_) {}
+      }
+    }
+  });
+
+  // ---- Test 68: Upload requires job title even when document is provided ----
+  await testAsync("68. Upload job description requires job title and cleans up file on validation error", async () => {
+    const docxBuffer = await createDocxWithText("Some job content");
+    const tempUploadPath = path.join(JOB_UPLOAD_DIR, `no_title_${Date.now()}.docx`);
+    fs.writeFileSync(tempUploadPath, docxBuffer);
+
+    const req = {
+      user: { id: 999 },
+      file: {
+        path: tempUploadPath,
+        originalname: "job.docx",
+      },
+      body: {
+        title: "   ",
+      },
+    };
+    const res = createMockRes();
+
+    try {
+      await uploadJobDescription(req, res);
+      assert.strictEqual(res.statusCode, 400);
+      assert.strictEqual(res.body.success, false);
+      assert.ok(res.body.message.includes("title"));
+      assert.strictEqual(fs.existsSync(tempUploadPath), false, "File should be unlinked when title is missing");
+    } finally {
+      if (fs.existsSync(tempUploadPath)) {
+        try { fs.unlinkSync(tempUploadPath); } catch (_) {}
+      }
+    }
+  });
+
+  // ---- Test 69: List job descriptions returns user's records ordered by created_at DESC ----
+  await testAsync("69. List job descriptions retrieves user-owned jobs ordered by created_at DESC", async () => {
+    const [userRes] = await db.query(
+      `INSERT INTO users (full_name, email, password_hash) VALUES (?, ?, ?)`,
+      ["List Tester", `list_tester_${Date.now()}@example.com`, "hash"]
+    );
+    const testUserId = userRes.insertId;
+
+    try {
+      await db.query(
+        `INSERT INTO jobs (user_id, title, company, description, source_type, processing_status, created_at)
+         VALUES (?, 'Role A', 'Co A', 'Description A', 'PASTED_TEXT', 'COMPLETED', NOW() - INTERVAL 10 MINUTE),
+                (?, 'Role B', 'Co B', 'Description B', 'UPLOADED_FILE', 'COMPLETED', NOW())`,
+        [testUserId, testUserId]
+      );
+
+      const req = { user: { id: testUserId } };
+      const res = createMockRes();
+
+      await getJobDescriptions(req, res);
+      assert.strictEqual(res.statusCode, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.strictEqual(res.body.jobs.length, 2);
+      assert.strictEqual(res.body.jobs[0].title, "Role B", "Latest created job must come first");
+      assert.strictEqual(res.body.jobs[1].title, "Role A");
+      assert.ok(res.body.jobs[0].description_preview, "Description preview snippet must be present");
+    } finally {
+      await db.query(`DELETE FROM users WHERE id = ?`, [testUserId]);
+    }
+  });
+
+  // ---- Test 70: Cross-user isolation: User cannot retrieve another user's job description ----
+  await testAsync("70. Get job description by ID enforces ownership boundaries across users", async () => {
+    const [u1] = await db.query(
+      `INSERT INTO users (full_name, email, password_hash) VALUES (?, ?, ?)`,
+      ["Owner User", `owner_${Date.now()}@example.com`, "hash"]
+    );
+    const [u2] = await db.query(
+      `INSERT INTO users (full_name, email, password_hash) VALUES (?, ?, ?)`,
+      ["Other User", `other_${Date.now()}@example.com`, "hash"]
+    );
+    const ownerId = u1.insertId;
+    const intruderId = u2.insertId;
+
+    try {
+      const [jobRes] = await db.query(
+        `INSERT INTO jobs (user_id, title, description, source_type, processing_status)
+         VALUES (?, 'Secret Role', 'Confidential Job', 'PASTED_TEXT', 'COMPLETED')`,
+        [ownerId]
+      );
+      const jobId = jobRes.insertId;
+
+      // Intruder attempts to fetch
+      const intruderReq = { user: { id: intruderId }, params: { id: jobId } };
+      const intruderRes = createMockRes();
+      await getJobDescriptionById(intruderReq, intruderRes);
+
+      assert.strictEqual(intruderRes.statusCode, 404);
+      assert.strictEqual(intruderRes.body.success, false);
+
+      // Owner fetches successfully
+      const ownerReq = { user: { id: ownerId }, params: { id: jobId } };
+      const ownerRes = createMockRes();
+      await getJobDescriptionById(ownerReq, ownerRes);
+
+      assert.strictEqual(ownerRes.statusCode, 200);
+      assert.strictEqual(ownerRes.body.success, true);
+      assert.strictEqual(ownerRes.body.job.title, "Secret Role");
+    } finally {
+      await db.query(`DELETE FROM users WHERE id IN (?, ?)`, [ownerId, intruderId]);
+    }
+  });
+
+  // ---- Test 71: Reject unauthenticated requests ----
+  await testAsync("71. Job description endpoints reject unauthenticated access", async () => {
+    const unauthReq = { user: null, body: { title: "Title", description: "Desc" } };
+    const unauthRes = createMockRes();
+
+    await createJobDescription(unauthReq, unauthRes);
+    assert.strictEqual(unauthRes.statusCode, 401);
+    assert.strictEqual(unauthRes.body.success, false);
   });
 
   // Cleanup temp files

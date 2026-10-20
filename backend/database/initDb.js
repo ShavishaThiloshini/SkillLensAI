@@ -2,8 +2,10 @@ const db = require("../config/db");
 
 /**
  * Initializes required database tables if they do not exist.
- * Includes users, resumes, resume_sections, skills, and resume_skills
+ * Includes users, resumes, resume_sections, skills, resume_skills, and jobs
  * adhering to docs/DATABASE_SCHEMA.md.
+ *
+ * Day 15: Added `jobs` table for job description input.
  */
 async function initDb() {
   const createUsersTableQuery = `
@@ -74,6 +76,22 @@ async function initDb() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
   `;
 
+  const createJobsTableQuery = `
+    CREATE TABLE IF NOT EXISTS jobs (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      title VARCHAR(200) NOT NULL,
+      company VARCHAR(200) NULL,
+      description LONGTEXT NOT NULL,
+      source_type ENUM('PASTED_TEXT', 'UPLOADED_FILE') NOT NULL,
+      processing_status ENUM('COMPLETED', 'FAILED') NOT NULL DEFAULT 'COMPLETED',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_jobs_user_id (user_id),
+      CONSTRAINT fk_jobs_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `;
+
   try {
     await db.query(createUsersTableQuery);
     console.log("[DB] `users` table verified/created successfully.");
@@ -89,6 +107,9 @@ async function initDb() {
 
     await db.query(createResumeSkillsTableQuery);
     console.log("[DB] `resume_skills` table verified/created successfully.");
+
+    await db.query(createJobsTableQuery);
+    console.log("[DB] `jobs` table verified/created successfully.");
 
     return true;
   } catch (error) {
