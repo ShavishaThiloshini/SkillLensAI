@@ -1755,6 +1755,419 @@ async function runTests() {
     assert.strictEqual(unauthRes.body.success, false);
   });
 
+  // =========================================================================
+  // Day 16: Job Requirement Extraction Test Suite
+  // =========================================================================
+  const JobRequirementExtractionService = require("../services/jobRequirementExtractionService");
+  const {
+    extractRequirementsForJob,
+    getJobRequirements,
+  } = require("../controllers/jobController");
+
+  // ---- Test 72: Description with explicit required skills ----
+  await testAsync("72. Extract explicit required skills from mandatory section and cues", async () => {
+    const text = `Title: Senior Backend Developer
+Requirements:
+- Must have experience with React and Node.js.
+- Strong knowledge of SQL and Problem Solving.
+- Required: Python programming skills.`;
+
+    const res = JobRequirementExtractionService.extractRequirements(text, 10, "Senior Backend Developer");
+    assert.strictEqual(res.jobDescriptionId, 10);
+    assert.strictEqual(res.jobTitle, "Senior Backend Developer");
+    const reqNames = res.requiredSkills.map((s) => s.name);
+    assert.ok(reqNames.includes("React"), "React must be in required skills");
+    assert.ok(reqNames.includes("Node.js"), "Node.js must be in required skills");
+    assert.ok(reqNames.includes("SQL"), "SQL must be in required skills");
+    assert.ok(reqNames.includes("Python"), "Python must be in required skills");
+    assert.ok(reqNames.includes("Problem Solving"), "Problem Solving must be in required skills");
+    for (const item of res.requiredSkills) {
+      assert.strictEqual(item.required, true);
+    }
+  });
+
+  // ---- Test 73: Description with preferred skills ----
+  await testAsync("73. Extract preferred skills from optional/bonus sections without marking required", async () => {
+    const text = `About the role: We are building next-gen developer tools.
+Preferred Qualifications:
+- Familiarity with TypeScript and Docker.
+- Experience with GraphQL is a plus.
+- Knowledge of Kubernetes would be an advantage.`;
+
+    const res = JobRequirementExtractionService.extractRequirements(text, 11, "Frontend Engineer");
+    const prefNames = res.preferredSkills.map((s) => s.name);
+    assert.ok(prefNames.includes("TypeScript"), "TypeScript must be preferred");
+    assert.ok(prefNames.includes("Docker"), "Docker must be preferred");
+    assert.ok(prefNames.includes("GraphQL"), "GraphQL must be preferred");
+    assert.ok(prefNames.includes("Kubernetes"), "Kubernetes must be preferred");
+    assert.strictEqual(res.requiredSkills.length, 0, "No skills should be classified as required");
+    for (const item of res.preferredSkills) {
+      assert.strictEqual(item.required, false);
+    }
+  });
+
+  // ---- Test 74: Description with required and preferred skills mixed together ----
+  await testAsync("74. Distinguish required from preferred skills when mixed in same job description", async () => {
+    const text = `Required Qualifications:
+- Must possess solid experience with JavaScript and React.
+- Minimum 3 years building APIs with Node.js.
+
+Nice To Have:
+- Experience with AWS and Redis is a bonus.
+- Familiarity with Figma.`;
+
+    const res = JobRequirementExtractionService.extractRequirements(text, 12, "Full Stack Engineer");
+    const reqNames = res.requiredSkills.map((s) => s.name);
+    const prefNames = res.preferredSkills.map((s) => s.name);
+
+    assert.ok(reqNames.includes("JavaScript"), "JavaScript must be required");
+    assert.ok(reqNames.includes("React"), "React must be required");
+    assert.ok(reqNames.includes("Node.js"), "Node.js must be required");
+
+    assert.ok(prefNames.includes("AWS"), "AWS must be preferred");
+    assert.ok(prefNames.includes("Redis"), "Redis must be preferred");
+    assert.ok(prefNames.includes("Figma"), "Figma must be preferred");
+
+    assert.ok(!reqNames.includes("AWS"), "AWS must not be marked required");
+    assert.ok(!prefNames.includes("React"), "React must not be marked preferred");
+  });
+
+  // ---- Test 75: Description specifying minimum number of experience years ----
+  await testAsync("75. Extract minimum years of experience accurately", async () => {
+    const text = `About Us: Enterprise SaaS leader.
+Requirements:
+- Minimum of 4 years of experience building distributed systems.
+- Must have experience with Go and PostgreSQL.`;
+
+    const res = JobRequirementExtractionService.extractRequirements(text, 13, "Systems Engineer");
+    assert.strictEqual(res.experience.minimumYears, 4);
+    assert.strictEqual(res.experience.maximumYears, null);
+    assert.ok(res.experience.details.length > 0);
+  });
+
+  // ---- Test 76: Description with experience range ----
+  await testAsync("76. Extract experience range (min and max years)", async () => {
+    const text = `Role: Senior Software Engineer
+Job Description:
+- Seeking an engineer with 3-5 years of experience in software development.
+- Strong proficiency in Java and Spring Boot.`;
+
+    const res = JobRequirementExtractionService.extractRequirements(text, 14, "Senior Software Engineer");
+    assert.strictEqual(res.experience.minimumYears, 3);
+    assert.strictEqual(res.experience.maximumYears, 5);
+    assert.strictEqual(res.experience.level, "Senior");
+  });
+
+  // ---- Test 77: Description with no specified years of experience ----
+  await testAsync("77. Represent missing experience years as null, not zero", async () => {
+    const text = `Role: Frontend Developer
+Duties:
+- Build reusable UI components using React and HTML5.
+- Collaborate with UX designers on responsive interfaces.`;
+
+    const res = JobRequirementExtractionService.extractRequirements(text, 15, "Frontend Developer");
+    assert.strictEqual(res.experience.minimumYears, null, "Missing min years must be null");
+    assert.strictEqual(res.experience.maximumYears, null, "Missing max years must be null");
+    assert.notStrictEqual(res.experience.minimumYears, 0, "Missing years must not default to 0");
+  });
+
+  // ---- Test 78: Required and preferred education ----
+  await testAsync("78. Extract required and preferred education degrees and fields with equivalent acceptance", async () => {
+    const text = `Basic Qualifications:
+- Bachelor's degree in Computer Science or related technical field, or equivalent practical experience.
+- Strong problem-solving skills.
+
+Preferred Qualifications:
+- Master's degree in Software Engineering is preferred.`;
+
+    const res = JobRequirementExtractionService.extractRequirements(text, 16, "Software Engineer");
+    assert.strictEqual(res.education.length, 2, "Must extract both bachelor's and master's entries");
+
+    const bachelor = res.education.find((e) => e.level === "BACHELOR");
+    assert.ok(bachelor, "Bachelor entry must exist");
+    assert.strictEqual(bachelor.required, true, "Bachelor must be required");
+    assert.strictEqual(bachelor.field, "Computer Science");
+    assert.strictEqual(bachelor.equivalentAccepted, true, "Equivalent practical experience must be recognized");
+
+    const master = res.education.find((e) => e.level === "MASTER");
+    assert.ok(master, "Master entry must exist");
+    assert.strictEqual(master.required, false, "Master must be preferred");
+    assert.strictEqual(master.field, "Software Engineering");
+  });
+
+  // ---- Test 79: Tools and technologies in different sections ----
+  await testAsync("79. Correctly categorize development tools vs programming technologies", async () => {
+    const text = `Required Skills:
+- Programming Languages: Python, Java, SQL.
+- Frameworks: React, Express.js.
+- Development Tools & Utilities: Git, Jira, Docker, VS Code, CI/CD.`;
+
+    const res = JobRequirementExtractionService.extractRequirements(text, 17, "Full Stack Dev");
+    const techNames = res.technologies.map((t) => t.name);
+    const toolNames = res.tools.map((t) => t.name);
+
+    assert.ok(techNames.includes("Python"));
+    assert.ok(techNames.includes("Java"));
+    assert.ok(techNames.includes("SQL"));
+    assert.ok(techNames.includes("React"));
+    assert.ok(techNames.includes("Express.js"));
+
+    assert.ok(toolNames.includes("Git"));
+    assert.ok(toolNames.includes("Jira"));
+    assert.ok(toolNames.includes("Docker"));
+    assert.ok(toolNames.includes("VS Code"));
+    assert.ok(toolNames.includes("CI/CD"));
+
+    // Verify separation
+    assert.ok(!toolNames.includes("Python"), "Python must not be in tools");
+    assert.ok(!techNames.includes("Jira"), "Jira must not be in technologies");
+  });
+
+  // ---- Test 80: Explicit certification requirements ----
+  await testAsync("80. Extract explicit certification requirements and issuer details", async () => {
+    const text = `Requirements:
+- AWS Certified Solutions Architect certification required.
+- Project Management Professional (PMP) preferred.`;
+
+    const res = JobRequirementExtractionService.extractRequirements(text, 18, "Cloud Architect");
+    assert.strictEqual(res.certifications.length, 2);
+
+    const awsCert = res.certifications.find((c) => c.name.includes("AWS Certified Solutions Architect"));
+    assert.ok(awsCert, "AWS Certified Solutions Architect must be detected");
+    assert.strictEqual(awsCert.issuer, "Amazon Web Services");
+    assert.strictEqual(awsCert.required, true);
+
+    const pmpCert = res.certifications.find((c) => c.name.includes("PMP"));
+    assert.ok(pmpCert, "PMP must be detected");
+    assert.strictEqual(pmpCert.required, false);
+  });
+
+  // ---- Test 81: No certifications mentioned ----
+  await testAsync("81. Return empty array when no certifications are mentioned without inventing any", async () => {
+    const text = `Role: Junior Developer
+Requirements:
+- Experience with JavaScript, HTML, CSS.
+- Good communication skills.`;
+
+    const res = JobRequirementExtractionService.extractRequirements(text, 19, "Junior Developer");
+    assert.ok(Array.isArray(res.certifications));
+    assert.strictEqual(res.certifications.length, 0);
+  });
+
+  // ---- Test 82: Alternate names and duplicate technologies ----
+  await testAsync("82. Normalize alternate aliases and avoid duplicate technology entries", async () => {
+    const text = `Technologies:
+- NodeJS and Node.js
+- ReactJS and React
+- Postgres and PostgreSQL
+- JavaScript, JS, and ECMAScript`;
+
+    const res = JobRequirementExtractionService.extractRequirements(text, 20, "Web Dev");
+    const techNames = res.technologies.map((t) => t.name);
+
+    // Each canonical technology should appear exactly once
+    assert.strictEqual(techNames.filter((n) => n === "Node.js").length, 1);
+    assert.strictEqual(techNames.filter((n) => n === "React").length, 1);
+    assert.strictEqual(techNames.filter((n) => n === "PostgreSQL").length, 1);
+    assert.strictEqual(techNames.filter((n) => n === "JavaScript").length, 1);
+  });
+
+  // ---- Test 83: Negated or ambiguous requirements ----
+  await testAsync("83. Respect negation and do not classify negated items as mandatory requirements", async () => {
+    const text = `Requirements:
+- Must have experience with React and TypeScript.
+- No degree required. A college degree is not required for this role.
+- AWS certification is not required.`;
+
+    const res = JobRequirementExtractionService.extractRequirements(text, 21, "React Dev");
+    const reqSkills = res.requiredSkills.map((s) => s.name);
+    assert.ok(reqSkills.includes("React"));
+    assert.ok(reqSkills.includes("TypeScript"));
+
+    // Education should not have required degree
+    const requiredEducation = res.education.filter((e) => e.required);
+    assert.strictEqual(requiredEducation.length, 0, "No required degree should be extracted when explicitly negated");
+
+    // Certifications should not have required AWS certification
+    const requiredCerts = res.certifications.filter((c) => c.required);
+    assert.strictEqual(requiredCerts.length, 0, "No required certification when negated");
+  });
+
+  // ---- Test 84: Empty or missing job descriptions ----
+  await testAsync("84. Handle empty, null, or whitespace-only job descriptions gracefully", async () => {
+    const resEmpty = JobRequirementExtractionService.extractRequirements("", 22, "Empty Role");
+    assert.strictEqual(resEmpty.extractionMetadata.status, "EMPTY");
+    assert.strictEqual(resEmpty.requiredSkills.length, 0);
+    assert.strictEqual(resEmpty.preferredSkills.length, 0);
+    assert.strictEqual(resEmpty.experience.minimumYears, null);
+    assert.strictEqual(resEmpty.education.length, 0);
+    assert.strictEqual(resEmpty.tools.length, 0);
+    assert.strictEqual(resEmpty.technologies.length, 0);
+    assert.strictEqual(resEmpty.certifications.length, 0);
+
+    const resNull = JobRequirementExtractionService.extractRequirements(null, null, null);
+    assert.strictEqual(resNull.extractionMetadata.status, "EMPTY");
+  });
+
+  // ---- Test 85: Repeated extraction without duplicate records (Idempotency) ----
+  await testAsync("85. Repeated extraction is idempotent and does not create duplicate database records", async () => {
+    const [u] = await db.query(
+      `INSERT INTO users (full_name, email, password_hash) VALUES (?, ?, ?)`,
+      ["Idempotency Tester", `idempotency_${Date.now()}@example.com`, "hash"]
+    );
+    const userId = u.insertId;
+
+    try {
+      const [j] = await db.query(
+        `INSERT INTO jobs (user_id, title, description, source_type, processing_status)
+         VALUES (?, 'Cloud Engineer', 'Requirements: Must have AWS, Docker, Kubernetes. Preferred: Python.', 'PASTED_TEXT', 'COMPLETED')`,
+        [userId]
+      );
+      const jobId = j.insertId;
+
+      // First extraction
+      await JobRequirementExtractionService.processJobRequirements(jobId, userId);
+
+      const [reqs1] = await db.query(`SELECT COUNT(*) as count FROM job_requirements WHERE job_id = ?`, [jobId]);
+      const [skills1] = await db.query(`SELECT COUNT(*) as count FROM job_skills WHERE job_id = ?`, [jobId]);
+
+      assert.ok(reqs1[0].count > 0);
+      assert.ok(skills1[0].count > 0);
+
+      // Second extraction (retry)
+      await JobRequirementExtractionService.processJobRequirements(jobId, userId);
+
+      const [reqs2] = await db.query(`SELECT COUNT(*) as count FROM job_requirements WHERE job_id = ?`, [jobId]);
+      const [skills2] = await db.query(`SELECT COUNT(*) as count FROM job_skills WHERE job_id = ?`, [jobId]);
+
+      // Counts must be identical (no duplicates!)
+      assert.strictEqual(reqs2[0].count, reqs1[0].count, "Job requirements count must not double on re-extraction");
+      assert.strictEqual(skills2[0].count, skills1[0].count, "Job skills count must not double on re-extraction");
+
+      // Verify retrieving saved requirements
+      const saved = await JobRequirementExtractionService.getSavedRequirements(jobId);
+      assert.ok(saved);
+      assert.strictEqual(saved.jobDescriptionId, jobId);
+      assert.ok(saved.requiredSkills.length > 0);
+    } finally {
+      await db.query(`DELETE FROM users WHERE id = ?`, [userId]);
+    }
+  });
+
+  // ---- Test 86: Reject unauthenticated requests to extraction API ----
+  await testAsync("86. Extraction endpoints reject unauthenticated requests with 401", async () => {
+    const unauthReq = { user: null, params: { id: 1 } };
+    const unauthRes = createMockRes();
+
+    await extractRequirementsForJob(unauthReq, unauthRes);
+    assert.strictEqual(unauthRes.statusCode, 401);
+    assert.strictEqual(unauthRes.body.success, false);
+
+    const getReq = { user: null, params: { id: 1 } };
+    const getRes = createMockRes();
+    await getJobRequirements(getReq, getRes);
+    assert.strictEqual(getRes.statusCode, 401);
+  });
+
+  // ---- Test 87: Attempts to access another user's job description ----
+  await testAsync("87. Cross-user isolation: User cannot extract or view requirements for another user's job", async () => {
+    const [u1] = await db.query(
+      `INSERT INTO users (full_name, email, password_hash) VALUES (?, ?, ?)`,
+      ["Job Owner", `owner_${Date.now()}@example.com`, "hash"]
+    );
+    const [u2] = await db.query(
+      `INSERT INTO users (full_name, email, password_hash) VALUES (?, ?, ?)`,
+      ["Job Intruder", `intruder_${Date.now()}@example.com`, "hash"]
+    );
+    const ownerId = u1.insertId;
+    const intruderId = u2.insertId;
+
+    try {
+      const [j] = await db.query(
+        `INSERT INTO jobs (user_id, title, description, source_type, processing_status)
+         VALUES (?, 'Private Role', 'Requirements: Must have React.', 'PASTED_TEXT', 'COMPLETED')`,
+        [ownerId]
+      );
+      const jobId = j.insertId;
+
+      // Intruder attempts to extract
+      const extractReq = { user: { id: intruderId }, params: { id: jobId } };
+      const extractRes = createMockRes();
+      await extractRequirementsForJob(extractReq, extractRes);
+      assert.strictEqual(extractRes.statusCode, 404);
+      assert.strictEqual(extractRes.body.success, false);
+
+      // Intruder attempts to get requirements
+      const getReq = { user: { id: intruderId }, params: { id: jobId } };
+      const getRes = createMockRes();
+      await getJobRequirements(getReq, getRes);
+      assert.strictEqual(getRes.statusCode, 404);
+      assert.strictEqual(getRes.body.success, false);
+    } finally {
+      await db.query(`DELETE FROM users WHERE id IN (?, ?)`, [ownerId, intruderId]);
+    }
+  });
+
+  // ---- Test 88: Database failure during persistence rolls back safely ----
+  await testAsync("88. Persistence safely rolls back and reports failure when database error occurs", async () => {
+    let threw = false;
+    try {
+      // Pass invalid jobId with missing requirements
+      await JobRequirementExtractionService.persistRequirements(null, null);
+    } catch (err) {
+      threw = true;
+      assert.ok(err.message.includes("required"));
+    }
+    assert.strictEqual(threw, true);
+  });
+
+  // ---- Test 89: Frontend requirements contract and invariant validation ----
+  await testAsync("89. Extracted requirements structure satisfies frontend display contract", async () => {
+    const text = `Senior Full Stack Architect
+Requirements:
+- 5-8 years of experience building distributed systems.
+- Bachelor's degree in Computer Science or equivalent.
+- Must know React, Node.js, and PostgreSQL.
+- Experience with Docker, Git, and CI/CD tools.
+- AWS Certified Solutions Architect is a plus.`;
+
+    const res = JobRequirementExtractionService.extractRequirements(text, 99, "Senior Full Stack Architect");
+
+    // Check all top-level keys required by frontend
+    assert.ok(Object.prototype.hasOwnProperty.call(res, "jobDescriptionId"));
+    assert.ok(Object.prototype.hasOwnProperty.call(res, "jobTitle"));
+    assert.ok(Array.isArray(res.requiredSkills));
+    assert.ok(Array.isArray(res.preferredSkills));
+    assert.ok(typeof res.experience === "object" && res.experience !== null);
+    assert.ok(Array.isArray(res.education));
+    assert.ok(Array.isArray(res.tools));
+    assert.ok(Array.isArray(res.technologies));
+    assert.ok(Array.isArray(res.certifications));
+    assert.ok(typeof res.extractionMetadata === "object");
+    assert.ok(Array.isArray(res.extractionMetadata.warnings));
+
+    // Verify item structures
+    if (res.requiredSkills.length > 0) {
+      const s = res.requiredSkills[0];
+      assert.ok(typeof s.name === "string");
+      assert.ok(typeof s.required === "boolean");
+      assert.strictEqual(s.required, true);
+    }
+
+    if (res.education.length > 0) {
+      const e = res.education[0];
+      assert.ok(typeof e.degree === "string");
+      assert.ok(typeof e.required === "boolean");
+      assert.ok(typeof e.equivalentAccepted === "boolean");
+    }
+
+    if (res.certifications.length > 0) {
+      const c = res.certifications[0];
+      assert.ok(typeof c.name === "string");
+      assert.ok(typeof c.required === "boolean");
+    }
+  });
+
   // Cleanup temp files
   try {
     fs.rmSync(testDir, { recursive: true, force: true });

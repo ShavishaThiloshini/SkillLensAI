@@ -3,6 +3,7 @@ const path = require("path");
 const db = require("../config/db");
 const { validateResumeFile } = require("../utils/fileValidator");
 const { extractDocumentText } = require("../utils/documentParser");
+const JobRequirementExtractionService = require("../services/jobRequirementExtractionService");
 
 // Maximum allowed pasted text length (characters)
 const MAX_DESCRIPTION_LENGTH = 30000;
@@ -347,11 +348,137 @@ async function getJobDescriptionById(req, res) {
   }
 }
 
+/**
+ * POST /api/job-descriptions/:id/extract-requirements
+ * Extracts structured requirements (skills, experience, education, tools, technologies, certifications)
+ * from an existing job description belonging to the authenticated user.
+ */
+async function extractRequirementsForJob(req, res) {
+  const userId = req.user?.id;
+  const jobId = Number(req.params.id);
+
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      message: "Authentication required.",
+    });
+  }
+
+  if (!jobId || Number.isNaN(jobId)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid job description ID.",
+    });
+  }
+
+  try {
+    const result = await JobRequirementExtractionService.processJobRequirements(jobId, userId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Job requirements extracted and saved successfully.",
+      jobId: result.jobId,
+      jobTitle: result.jobTitle,
+      requirements: result.requirements,
+    });
+  } catch (error) {
+    if (error.status === 404) {
+      return res.status(404).json({
+        success: false,
+        message: error.message || "Job description not found or access denied.",
+      });
+    }
+
+    if (error.status === 400) {
+      return res.status(400).json({
+        success: false,
+        message: error.message || "Invalid request.",
+      });
+    }
+
+    console.error("[JobController] Error extracting job requirements:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to extract requirements from the job description. Please try again.",
+    });
+  }
+}
+
+/**
+ * GET /api/job-descriptions/:id/requirements
+ * Retrieves previously saved extracted requirements for a job description owned by the user.
+ */
+async function getJobRequirements(req, res) {
+  const userId = req.user?.id;
+  const jobId = Number(req.params.id);
+
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      message: "Authentication required.",
+    });
+  }
+
+  if (!jobId || Number.isNaN(jobId)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid job description ID.",
+    });
+  }
+
+  try {
+    // 1. Verify existence and ownership
+    const [jobs] = await db.query(
+      `SELECT id, title, company FROM jobs WHERE id = ? AND user_id = ? LIMIT 1`,
+      [jobId, userId]
+    );
+
+    if (!jobs || jobs.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Job description not found or access denied.",
+      });
+    }
+
+    const job = jobs[0];
+
+    // 2. Fetch saved requirements
+    const requirements = await JobRequirementExtractionService.getSavedRequirements(jobId);
+
+    if (!requirements) {
+      return res.status(200).json({
+        success: true,
+        extracted: false,
+        message: "No requirements have been extracted for this job description yet.",
+        jobId: job.id,
+        jobTitle: job.title,
+        requirements: null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      extracted: true,
+      jobId: job.id,
+      jobTitle: job.title,
+      requirements,
+    });
+  } catch (error) {
+    console.error("[JobController] Error retrieving job requirements:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to retrieve job requirements at this time.",
+    });
+  }
+}
+
 module.exports = {
   createJobDescription,
   uploadJobDescription,
   getJobDescriptions,
   getJobDescriptionById,
+  extractRequirementsForJob,
+  getJobRequirements,
   MAX_DESCRIPTION_LENGTH,
   MAX_TITLE_LENGTH,
   MAX_COMPANY_LENGTH,

@@ -6,6 +6,8 @@ const {
   uploadJobDescription,
   getJobDescriptions,
   getJobDescriptionById,
+  extractRequirementsForJob,
+  getJobRequirements,
 } = require("../controllers/jobController");
 const authenticateToken = require("../middleware/authMiddleware");
 const {
@@ -27,5 +29,11 @@ router.get("/", getJobDescriptions);
 
 // Retrieve a single job description owned by the authenticated user
 router.get("/:id", getJobDescriptionById);
+
+// Extract requirements for a saved job description
+router.post("/:id/extract-requirements", extractRequirementsForJob);
+
+// Retrieve saved extracted requirements for a job description
+router.get("/:id/requirements", getJobRequirements);
 
 module.exports = router;

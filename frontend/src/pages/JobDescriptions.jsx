@@ -8,7 +8,6 @@ import {
   AlertCircle,
   CheckCircle2,
   Search,
-  Eye,
   X,
   Copy,
   Check,
@@ -16,6 +15,11 @@ import {
   Sparkles,
   RefreshCw,
   FileCheck,
+  GraduationCap,
+  Award,
+  Wrench,
+  Code2,
+  AlertTriangle,
 } from 'lucide-react'
 import Button from '../components/common/Button'
 import Card, { CardBody, CardHeader } from '../components/common/Card'
@@ -27,6 +31,8 @@ import {
   uploadJobDescription,
   getJobDescriptions,
   getJobDescriptionById,
+  extractJobRequirements,
+  getJobRequirements,
 } from '../services/jobService'
 import styles from './JobDescriptions.module.css'
 
@@ -89,6 +95,14 @@ export default function JobDescriptions() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isLoadingDetails, setIsLoadingDetails] = useState(false)
   const [copySuccess, setCopySuccess] = useState(false)
+
+  // Day 16: Job Requirements Extraction Modal State
+  const [modalTab, setModalTab] = useState('requirements') // 'requirements' | 'raw'
+  const [jobRequirements, setJobRequirements] = useState(null)
+  const [isLoadingRequirements, setIsLoadingRequirements] = useState(false)
+  const [isExtractingRequirements, setIsExtractingRequirements] = useState(false)
+  const [requirementsError, setRequirementsError] = useState('')
+  const [requirementsSuccess, setRequirementsSuccess] = useState('')
 
   // Load existing job descriptions
   const fetchJobs = async () => {
@@ -299,15 +313,22 @@ export default function JobDescriptions() {
     }
   }
 
-  // View Details Modal
+  // View Details Modal & Requirements
   const handleViewDetails = async (jobId) => {
     setIsLoadingDetails(true)
     setIsModalOpen(true)
     setCopySuccess(false)
+    setModalTab('requirements')
+    setJobRequirements(null)
+    setRequirementsError('')
+    setRequirementsSuccess('')
+
     try {
       const data = await getJobDescriptionById(jobId)
       if (data.success) {
         setSelectedJob(data.job)
+        // Automatically check if requirements already exist for this job
+        fetchRequirements(jobId)
       } else {
         setFeedbackError(data.message || 'Failed to load job description details.')
       }
@@ -317,6 +338,45 @@ export default function JobDescriptions() {
       )
     } finally {
       setIsLoadingDetails(false)
+    }
+  }
+
+  const fetchRequirements = async (jobId) => {
+    setIsLoadingRequirements(true)
+    setRequirementsError('')
+    try {
+      const res = await getJobRequirements(jobId)
+      if (res.success && res.extracted && res.requirements) {
+        setJobRequirements(res.requirements)
+      } else {
+        setJobRequirements(null)
+      }
+    } catch (err) {
+      console.warn('Could not fetch requirements:', err.message)
+    } finally {
+      setIsLoadingRequirements(false)
+    }
+  }
+
+  const handleExtractRequirements = async (jobId) => {
+    setIsExtractingRequirements(true)
+    setRequirementsError('')
+    setRequirementsSuccess('')
+    try {
+      const res = await extractJobRequirements(jobId)
+      if (res.success && res.requirements) {
+        setJobRequirements(res.requirements)
+        setRequirementsSuccess('Job requirements extracted and saved successfully!')
+      } else {
+        setRequirementsError(res.message || 'Failed to extract requirements.')
+      }
+    } catch (err) {
+      setRequirementsError(
+        err.response?.data?.message ||
+          'Failed to extract requirements from this job description. Please try again.'
+      )
+    } finally {
+      setIsExtractingRequirements(false)
     }
   }
 
@@ -348,7 +408,7 @@ export default function JobDescriptions() {
             <h1 className={styles.title}>Job Descriptions</h1>
             <span className={styles.taglineBadge}>
               <Sparkles size={13} />
-              Day 15
+              Day 16: Job Requirements
             </span>
           </div>
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-indigo-dark)', fontWeight: 600 }}>
@@ -356,12 +416,19 @@ export default function JobDescriptions() {
           </span>
         </div>
         <p className={styles.description}>
-          Add the job descriptions you want to target. You can either paste text directly or upload
-          a PDF / DOCX file to automatically extract requirements for skill gap analysis.
+          Add the job descriptions you want to target. Extract and review required skills, preferred qualifications,
+          experience ranges, education, tools, technologies, and certifications.
         </p>
       </div>
 
       {/* Global Alerts */}
+      {jobsError && (
+        <div className={`${styles.alert} ${styles.alertError}`} role="alert">
+          <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+          <span>{jobsError}</span>
+        </div>
+      )}
+
       {feedbackError && (
         <div className={`${styles.alert} ${styles.alertError}`} role="alert">
           <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
@@ -723,8 +790,8 @@ export default function JobDescriptions() {
                   size="sm"
                   onClick={() => handleViewDetails(job.id)}
                 >
-                  <Eye size={14} />
-                  View Details
+                  <Sparkles size={14} color="var(--color-indigo)" />
+                  Requirements & Details
                 </Button>
               </div>
             </div>
@@ -757,8 +824,11 @@ export default function JobDescriptions() {
         onClose={() => {
           setIsModalOpen(false)
           setSelectedJob(null)
+          setJobRequirements(null)
+          setRequirementsError('')
+          setRequirementsSuccess('')
         }}
-        title="Job Description Details"
+        title="Job Description & Requirements"
         size="lg"
       >
         {isLoadingDetails && !selectedJob && (
@@ -793,34 +863,526 @@ export default function JobDescriptions() {
               </div>
             </div>
 
-            {/* Quick Stats Bar */}
-            <div className={styles.statsBar} style={{ marginTop: 'var(--space-3)' }}>
-              <div className={styles.statItem}>
-                <span>Characters:</span>
-                <span className={styles.statValue}>
-                  {selectedJob.description?.length.toLocaleString() || 0}
-                </span>
-              </div>
-              <div className={styles.statItem}>
-                <span>Words:</span>
-                <span className={styles.statValue}>
-                  {selectedJob.description
-                    ? selectedJob.description.trim().split(/\s+/).length.toLocaleString()
-                    : 0}
-                </span>
-              </div>
-              <div className={styles.statItem}>
-                <span>Status:</span>
-                <span className={styles.statValue} style={{ color: 'var(--color-emerald-dark)' }}>
-                  COMPLETED
-                </span>
-              </div>
+            {/* Modal Navigation Tabs */}
+            <div className={styles.modalTabsNav} style={{ marginTop: 'var(--space-3)' }}>
+              <button
+                type="button"
+                className={`${styles.modalTabBtn} ${modalTab === 'requirements' ? styles.modalTabBtnActive : ''}`}
+                onClick={() => setModalTab('requirements')}
+              >
+                <Sparkles size={15} />
+                Extracted Requirements
+              </button>
+              <button
+                type="button"
+                className={`${styles.modalTabBtn} ${modalTab === 'raw' ? styles.modalTabBtnActive : ''}`}
+                onClick={() => setModalTab('raw')}
+              >
+                <FileText size={15} />
+                Original Description
+              </button>
             </div>
 
-            {/* Full text viewer */}
-            <div className={styles.fullTextContainer}>
-              {selectedJob.description}
-            </div>
+            {/* TAB 1: EXTRACTED REQUIREMENTS */}
+            {modalTab === 'requirements' && (
+              <div>
+                {/* Requirements Action Bar */}
+                <div className={styles.reqActionBar}>
+                  <div className={styles.reqActionBarLeft}>
+                    <span className={styles.expHighlightLabel}>Status:</span>
+                    {jobRequirements ? (
+                      <span className={`${styles.reqStatusBadge} ${styles.reqStatusReady}`}>
+                        <CheckCircle2 size={12} /> Extracted & Persisted
+                      </span>
+                    ) : (
+                      <span className={`${styles.reqStatusBadge} ${styles.reqStatusPending}`}>
+                        <Clock size={12} /> Not Extracted Yet
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <Button
+                      variant={jobRequirements ? 'outline' : 'primary'}
+                      size="sm"
+                      onClick={() => handleExtractRequirements(selectedJob.id)}
+                      disabled={isExtractingRequirements || isLoadingRequirements}
+                    >
+                      {isExtractingRequirements ? (
+                        <>
+                          <RefreshCw size={14} className="spin" />
+                          Extracting Requirements...
+                        </>
+                      ) : jobRequirements ? (
+                        <>
+                          <RefreshCw size={14} />
+                          Re-extract Requirements
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={14} />
+                          Extract Requirements
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Error Banner */}
+                {requirementsError && (
+                  <div className={`${styles.alert} ${styles.alertError}`} role="alert" style={{ marginBottom: 'var(--space-3)' }}>
+                    <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                    <span style={{ flex: 1 }}>{requirementsError}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleExtractRequirements(selectedJob.id)}
+                      disabled={isExtractingRequirements}
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                )}
+
+                {/* Success Banner */}
+                {requirementsSuccess && (
+                  <div className={`${styles.alert} ${styles.alertSuccess}`} role="alert" style={{ marginBottom: 'var(--space-3)' }}>
+                    <CheckCircle2 size={16} style={{ flexShrink: 0 }} />
+                    <span>{requirementsSuccess}</span>
+                  </div>
+                )}
+
+                {/* Warnings Banner */}
+                {jobRequirements?.extractionMetadata?.warnings?.length > 0 && (
+                  <div className={styles.warningsBox}>
+                    <div className={styles.warningsTitle}>
+                      <AlertTriangle size={14} />
+                      Extraction Notes & Warnings ({jobRequirements.extractionMetadata.warnings.length}):
+                    </div>
+                    <ul style={{ margin: 0, paddingLeft: 'var(--space-4)' }}>
+                      {jobRequirements.extractionMetadata.warnings.map((w, idx) => (
+                        <li key={idx}>{w}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Loading State */}
+                {(isLoadingRequirements || isExtractingRequirements) && (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-12)', gap: 'var(--space-3)' }}>
+                    <Spinner size="lg" />
+                    <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
+                      {isExtractingRequirements
+                        ? 'Analyzing text and extracting skills, experience, education, tools, and certifications...'
+                        : 'Loading saved requirements...'}
+                    </p>
+                  </div>
+                )}
+
+                {/* Empty State: Requirements Not Extracted Yet */}
+                {!isLoadingRequirements && !isExtractingRequirements && !jobRequirements && (
+                  <div className={styles.emptyState} style={{ padding: 'var(--space-8)' }}>
+                    <div className={styles.emptyIconWrapper}>
+                      <Sparkles size={28} />
+                    </div>
+                    <h3 className={styles.emptyTitle}>Requirements Not Extracted Yet</h3>
+                    <p className={styles.emptyDescription}>
+                      Extract structured requirements to identify mandatory vs preferred skills,
+                      experience ranges, education qualifications, tools, technologies, and certifications.
+                    </p>
+                    <Button
+                      variant="primary"
+                      size="md"
+                      onClick={() => handleExtractRequirements(selectedJob.id)}
+                    >
+                      <Sparkles size={16} />
+                      Extract Requirements Now
+                    </Button>
+                  </div>
+                )}
+
+                {/* Extracted Structured Categories Display */}
+                {!isLoadingRequirements && !isExtractingRequirements && jobRequirements && (
+                  <div className={styles.requirementsContainer}>
+                    {/* CATEGORY 1: REQUIRED SKILLS */}
+                    <div className={styles.categorySection}>
+                      <div className={styles.categoryHeader}>
+                        <div className={styles.categoryTitleGroup}>
+                          <div className={`${styles.categoryIconWrapper} ${styles.iconReqSkills}`}>
+                            <Award size={16} />
+                          </div>
+                          <div>
+                            <h3 className={styles.categoryTitle}>Required Skills</h3>
+                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                              Explicitly mandatory skills and competencies
+                            </span>
+                          </div>
+                        </div>
+                        <span className={styles.categoryBadge}>
+                          {jobRequirements.requiredSkills?.length || 0} mandatory
+                        </span>
+                      </div>
+
+                      {jobRequirements.requiredSkills && jobRequirements.requiredSkills.length > 0 ? (
+                        <div className={styles.chipsGrid}>
+                          {jobRequirements.requiredSkills.map((skill, idx) => (
+                            <span
+                              key={idx}
+                              className={`${styles.chipItem} ${styles.chipRequired}`}
+                              title={skill.evidence || skill.name}
+                            >
+                              <span>{skill.name}</span>
+                              <span className={styles.chipCategoryTag}>{skill.category}</span>
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className={styles.emptyCategory}>
+                          No explicitly mandatory skills identified in this description.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* CATEGORY 2: PREFERRED SKILLS */}
+                    <div className={styles.categorySection}>
+                      <div className={styles.categoryHeader}>
+                        <div className={styles.categoryTitleGroup}>
+                          <div className={`${styles.categoryIconWrapper} ${styles.iconPrefSkills}`}>
+                            <Sparkles size={16} />
+                          </div>
+                          <div>
+                            <h3 className={styles.categoryTitle}>Preferred Skills</h3>
+                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                              Optional, nice-to-have, and bonus competencies
+                            </span>
+                          </div>
+                        </div>
+                        <span className={styles.categoryBadge}>
+                          {jobRequirements.preferredSkills?.length || 0} nice-to-have
+                        </span>
+                      </div>
+
+                      {jobRequirements.preferredSkills && jobRequirements.preferredSkills.length > 0 ? (
+                        <div className={styles.chipsGrid}>
+                          {jobRequirements.preferredSkills.map((skill, idx) => (
+                            <span
+                              key={idx}
+                              className={`${styles.chipItem} ${styles.chipPreferred}`}
+                              title={skill.evidence || skill.name}
+                            >
+                              <span>{skill.name}</span>
+                              <span className={styles.chipCategoryTag}>{skill.category}</span>
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className={styles.emptyCategory}>
+                          No optional or preferred skills mentioned in this description.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* CATEGORY 3: EXPERIENCE REQUIREMENTS */}
+                    <div className={styles.categorySection}>
+                      <div className={styles.categoryHeader}>
+                        <div className={styles.categoryTitleGroup}>
+                          <div className={`${styles.categoryIconWrapper} ${styles.iconExp}`}>
+                            <Briefcase size={16} />
+                          </div>
+                          <div>
+                            <h3 className={styles.categoryTitle}>Experience Requirements</h3>
+                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                              Years of experience, seniority, and domain background
+                            </span>
+                          </div>
+                        </div>
+                        <span className={styles.categoryBadge}>
+                          {jobRequirements.experience?.level || 'Experience profile'}
+                        </span>
+                      </div>
+
+                      <div className={styles.expHighlightsGrid}>
+                        <div className={styles.expHighlightCard}>
+                          <span className={styles.expHighlightLabel}>Minimum Experience:</span>
+                          <span className={styles.expHighlightValue}>
+                            {jobRequirements.experience?.minimumYears !== null &&
+                            jobRequirements.experience?.minimumYears !== undefined
+                              ? `${jobRequirements.experience.minimumYears} years`
+                              : 'Not specified'}
+                          </span>
+                        </div>
+
+                        <div className={styles.expHighlightCard}>
+                          <span className={styles.expHighlightLabel}>Experience Range:</span>
+                          <span className={styles.expHighlightValue}>
+                            {jobRequirements.experience?.minimumYears !== null &&
+                            jobRequirements.experience?.maximumYears !== null
+                              ? `${jobRequirements.experience.minimumYears} – ${jobRequirements.experience.maximumYears} years`
+                              : jobRequirements.experience?.minimumYears !== null
+                              ? `${jobRequirements.experience.minimumYears}+ years`
+                              : 'Not specified'}
+                          </span>
+                        </div>
+
+                        <div className={styles.expHighlightCard}>
+                          <span className={styles.expHighlightLabel}>Seniority Level:</span>
+                          <span className={styles.expHighlightValue}>
+                            {jobRequirements.experience?.level || 'Not specified'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {jobRequirements.experience?.details && jobRequirements.experience.details.length > 0 && (
+                        <div>
+                          <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-semibold)', color: 'var(--color-navy)' }}>
+                            Relevant Domain & Functional Experience:
+                          </span>
+                          <ul className={styles.expDetailsList}>
+                            {jobRequirements.experience.details.map((detail, idx) => (
+                              <li key={idx}>{detail}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {jobRequirements.experience?.minimumYears === null &&
+                        (!jobRequirements.experience?.details || jobRequirements.experience.details.length === 0) && (
+                          <div className={styles.emptyCategory}>
+                            No specific years of experience or domain background required.
+                          </div>
+                        )}
+                    </div>
+
+                    {/* CATEGORY 4: EDUCATION REQUIREMENTS */}
+                    <div className={styles.categorySection}>
+                      <div className={styles.categoryHeader}>
+                        <div className={styles.categoryTitleGroup}>
+                          <div className={`${styles.categoryIconWrapper} ${styles.iconEdu}`}>
+                            <GraduationCap size={16} />
+                          </div>
+                          <div>
+                            <h3 className={styles.categoryTitle}>Education Requirements</h3>
+                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                              Academic degrees, fields of study, and equivalent qualifications
+                            </span>
+                          </div>
+                        </div>
+                        <span className={styles.categoryBadge}>
+                          {jobRequirements.education?.length || 0} qualifications
+                        </span>
+                      </div>
+
+                      {jobRequirements.education && jobRequirements.education.length > 0 ? (
+                        <div className={styles.structuredItemList}>
+                          {jobRequirements.education.map((edu, idx) => (
+                            <div key={idx} className={styles.structuredItemCard}>
+                              <div className={styles.structuredItemTop}>
+                                <span className={styles.structuredItemName}>{edu.degree}</span>
+                                <span className={edu.required ? styles.itemBadgeRequired : styles.itemBadgePreferred}>
+                                  {edu.required ? 'Mandatory' : 'Preferred'}
+                                </span>
+                              </div>
+
+                              <div className={styles.structuredItemMeta}>
+                                {edu.field && (
+                                  <span>
+                                    <strong>Field:</strong> {edu.field}
+                                  </span>
+                                )}
+                                {edu.equivalentAccepted && (
+                                  <span style={{ color: 'var(--color-indigo)' }}>
+                                    ✓ Equivalent practical experience accepted
+                                  </span>
+                                )}
+                              </div>
+
+                              {edu.evidence && (
+                                <div className={styles.evidenceText}>
+                                  "{edu.evidence}"
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className={styles.emptyCategory}>
+                          No formal degree or educational requirements specified.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* CATEGORY 5: TOOLS */}
+                    <div className={styles.categorySection}>
+                      <div className={styles.categoryHeader}>
+                        <div className={styles.categoryTitleGroup}>
+                          <div className={`${styles.categoryIconWrapper} ${styles.iconTools}`}>
+                            <Wrench size={16} />
+                          </div>
+                          <div>
+                            <h3 className={styles.categoryTitle}>Tools & Platforms</h3>
+                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                              Version control, CI/CD, issue trackers, IDEs, and utilities
+                            </span>
+                          </div>
+                        </div>
+                        <span className={styles.categoryBadge}>
+                          {jobRequirements.tools?.length || 0} tools
+                        </span>
+                      </div>
+
+                      {jobRequirements.tools && jobRequirements.tools.length > 0 ? (
+                        <div className={styles.chipsGrid}>
+                          {jobRequirements.tools.map((tool, idx) => (
+                            <span
+                              key={idx}
+                              className={`${styles.chipItem} ${tool.required ? styles.chipRequired : styles.chipPreferred}`}
+                              title={tool.evidence || tool.name}
+                            >
+                              <span>{tool.name}</span>
+                              <span className={styles.chipCategoryTag}>
+                                {tool.required ? 'Required' : 'Preferred'}
+                              </span>
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className={styles.emptyCategory}>
+                          No specific developer tools or platforms identified.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* CATEGORY 6: TECHNOLOGIES */}
+                    <div className={styles.categorySection}>
+                      <div className={styles.categoryHeader}>
+                        <div className={styles.categoryTitleGroup}>
+                          <div className={`${styles.categoryIconWrapper} ${styles.iconTech}`}>
+                            <Code2 size={16} />
+                          </div>
+                          <div>
+                            <h3 className={styles.categoryTitle}>Technologies</h3>
+                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                              Programming languages, frameworks, databases, and cloud infrastructure
+                            </span>
+                          </div>
+                        </div>
+                        <span className={styles.categoryBadge}>
+                          {jobRequirements.technologies?.length || 0} technologies
+                        </span>
+                      </div>
+
+                      {jobRequirements.technologies && jobRequirements.technologies.length > 0 ? (
+                        <div className={styles.chipsGrid}>
+                          {jobRequirements.technologies.map((tech, idx) => (
+                            <span
+                              key={idx}
+                              className={`${styles.chipItem} ${tech.required ? styles.chipRequired : styles.chipPreferred}`}
+                              title={tech.evidence || tech.name}
+                            >
+                              <span>{tech.name}</span>
+                              <span className={styles.chipCategoryTag}>
+                                {tech.category} • {tech.required ? 'Required' : 'Preferred'}
+                              </span>
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className={styles.emptyCategory}>
+                          No programming languages, frameworks, or databases identified.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* CATEGORY 7: CERTIFICATIONS */}
+                    <div className={styles.categorySection}>
+                      <div className={styles.categoryHeader}>
+                        <div className={styles.categoryTitleGroup}>
+                          <div className={`${styles.categoryIconWrapper} ${styles.iconCerts}`}>
+                            <Award size={16} />
+                          </div>
+                          <div>
+                            <h3 className={styles.categoryTitle}>Certifications</h3>
+                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                              Professional licenses, credentials, and cloud certificates
+                            </span>
+                          </div>
+                        </div>
+                        <span className={styles.categoryBadge}>
+                          {jobRequirements.certifications?.length || 0} certifications
+                        </span>
+                      </div>
+
+                      {jobRequirements.certifications && jobRequirements.certifications.length > 0 ? (
+                        <div className={styles.structuredItemList}>
+                          {jobRequirements.certifications.map((cert, idx) => (
+                            <div key={idx} className={styles.structuredItemCard}>
+                              <div className={styles.structuredItemTop}>
+                                <span className={styles.structuredItemName}>{cert.name}</span>
+                                <span className={cert.required ? styles.itemBadgeRequired : styles.itemBadgePreferred}>
+                                  {cert.required ? 'Mandatory' : 'Preferred'}
+                                </span>
+                              </div>
+
+                              {cert.issuer && (
+                                <div className={styles.structuredItemMeta}>
+                                  <span>
+                                    <strong>Issuer:</strong> {cert.issuer}
+                                  </span>
+                                </div>
+                              )}
+
+                              {cert.evidence && (
+                                <div className={styles.evidenceText}>
+                                  "{cert.evidence}"
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className={styles.emptyCategory}>
+                          No certifications mentioned in this job description.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 2: ORIGINAL DESCRIPTION */}
+            {modalTab === 'raw' && (
+              <div>
+                {/* Quick Stats Bar */}
+                <div className={styles.statsBar}>
+                  <div className={styles.statItem}>
+                    <span>Characters:</span>
+                    <span className={styles.statValue}>
+                      {selectedJob.description?.length.toLocaleString() || 0}
+                    </span>
+                  </div>
+                  <div className={styles.statItem}>
+                    <span>Words:</span>
+                    <span className={styles.statValue}>
+                      {selectedJob.description
+                        ? selectedJob.description.trim().split(/\s+/).length.toLocaleString()
+                        : 0}
+                    </span>
+                  </div>
+                  <div className={styles.statItem}>
+                    <span>Source:</span>
+                    <span className={styles.statValue}>
+                      {selectedJob.source_type === 'UPLOADED_FILE' ? 'Document Upload' : 'Pasted Text'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Full text viewer */}
+                <div className={styles.fullTextContainer}>
+                  {selectedJob.description}
+                </div>
+              </div>
+            )}
 
             {/* Modal Footer Actions */}
             <div className={styles.modalFooter}>
@@ -849,6 +1411,9 @@ export default function JobDescriptions() {
                 onClick={() => {
                   setIsModalOpen(false)
                   setSelectedJob(null)
+                  setJobRequirements(null)
+                  setRequirementsError('')
+                  setRequirementsSuccess('')
                 }}
               >
                 Close

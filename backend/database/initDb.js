@@ -92,6 +92,36 @@ async function initDb() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
   `;
 
+  const createJobRequirementsTableQuery = `
+    CREATE TABLE IF NOT EXISTS job_requirements (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      job_id INT NOT NULL,
+      requirement_type ENUM('SKILL', 'EXPERIENCE', 'EDUCATION', 'CERTIFICATION', 'RESPONSIBILITY', 'TOOL', 'TECHNOLOGY', 'OTHER', 'STRUCTURED_DATA') NOT NULL,
+      requirement_text LONGTEXT NOT NULL,
+      priority ENUM('HIGH', 'MEDIUM', 'LOW') NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_jr_job_id (job_id),
+      CONSTRAINT fk_jr_job FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `;
+
+  const createJobSkillsTableQuery = `
+    CREATE TABLE IF NOT EXISTS job_skills (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      job_id INT NOT NULL,
+      skill_id INT NOT NULL,
+      priority ENUM('HIGH', 'MEDIUM', 'LOW') NOT NULL,
+      required BOOLEAN DEFAULT TRUE,
+      evidence TEXT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_js_job_id (job_id),
+      INDEX idx_js_skill_id (skill_id),
+      UNIQUE KEY uq_job_skill (job_id, skill_id),
+      CONSTRAINT fk_js_job FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE,
+      CONSTRAINT fk_js_skill FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `;
+
   try {
     await db.query(createUsersTableQuery);
     console.log("[DB] `users` table verified/created successfully.");
@@ -110,6 +140,12 @@ async function initDb() {
 
     await db.query(createJobsTableQuery);
     console.log("[DB] `jobs` table verified/created successfully.");
+
+    await db.query(createJobRequirementsTableQuery);
+    console.log("[DB] `job_requirements` table verified/created successfully.");
+
+    await db.query(createJobSkillsTableQuery);
+    console.log("[DB] `job_skills` table verified/created successfully.");
 
     return true;
   } catch (error) {

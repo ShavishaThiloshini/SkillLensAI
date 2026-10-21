@@ -77,9 +77,34 @@ export async function getJobDescriptionById(id) {
   return response.data
 }
 
+/**
+ * Triggers extraction of structured requirements (skills, experience, education,
+ * tools, technologies, certifications) for a saved job description.
+ *
+ * @param {number|string} id - Job description ID
+ * @returns {Promise<{ success: boolean, message: string, jobId: number, jobTitle: string, requirements: Object }>}
+ */
+export async function extractJobRequirements(id) {
+  const response = await api.post(`/job-descriptions/${id}/extract-requirements`)
+  return response.data
+}
+
+/**
+ * Retrieves previously saved extracted requirements for a job description.
+ *
+ * @param {number|string} id - Job description ID
+ * @returns {Promise<{ success: boolean, extracted: boolean, message?: string, jobId: number, jobTitle: string, requirements: Object|null }>}
+ */
+export async function getJobRequirements(id) {
+  const response = await api.get(`/job-descriptions/${id}/requirements`)
+  return response.data
+}
+
 export default {
   createJobDescription,
   uploadJobDescription,
   getJobDescriptions,
   getJobDescriptionById,
+  extractJobRequirements,
+  getJobRequirements,
 }
