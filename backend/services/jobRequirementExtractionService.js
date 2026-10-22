@@ -457,10 +457,10 @@ class JobRequirementExtractionService {
     }
 
     // 2. Extract Years of Experience
-    // Regex for numeric years range: "3-5 years", "3 to 5 years", "3 - 5 years of experience"
-    const rangeRegex = /\b(\d{1,2})\s*(?:-|to|\/)\s*(\d{1,2})\s*(?:\+)?\s*(?:years?|yrs?)(?:\s+of)?(?:\s+relevant|\s+professional|\s+work)?\s+experience\b/i;
+    // Regex for numeric years range: "3-5 years", "3 to 5 years", "3 - 5 years of experience", "3-5 years of professional software development experience"
+    const rangeRegex = /\b(\d{1,2})\s*(?:-|to|\/)\s*(\d{1,2})\s*(?:\+)?\s*(?:years?|yrs?)(?:(?:\s+of|\s+in)?(?:\s+[\w-]+){0,4})?\s+experience\b/i;
     // Regex for single year with plus / min / at least: "5+ years", "at least 3 years", "minimum of 4 years", "3+ years of experience"
-    const minRegex = /(?:(?:minimum|at\s+least|min\.?)\s+(?:of\s+)?)?(\d{1,2})\s*(?:\+)?\s*(?:years?|yrs?)(?:\s+of)?(?:\s+relevant|\s+professional|\s+work)?\s+experience\b/i;
+    const minRegex = /(?:(?:minimum|at\s+least|min\.?)\s+(?:of\s+)?)?(\d{1,2})\s*(?:\+)?\s*(?:years?|yrs?)(?:(?:\s+of|\s+in)?(?:\s+[\w-]+){0,4})?\s+experience\b/i;
     // Contextual: "X+ years experience" or "X years in software"
     const genericYearsRegex = /\b(\d{1,2})\s*\+\s*(?:years?|yrs?)\b/i;
 

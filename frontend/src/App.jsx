@@ -5,25 +5,27 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import ResumeDashboard from './pages/ResumeDashboard'
 import JobDescriptions from './pages/JobDescriptions'
+import JobAnalysis from './pages/JobAnalysis'
 import { ProtectedRoute, PublicOnlyRoute } from './components/common/ProtectedRoute'
 import { useAuth } from './context/useAuth'
 
 /**
  * SkillLens AI — App Router
  *
- * Day 08: Authentication UI & State Management.
+ * Day 17: Job Analysis UI added.
  * Routes:
- *  /           → dynamic redirect (/dashboard if authenticated, else /login)
- *  /login      → public only (redirects to /dashboard if logged in)
- *  /register   → public only (redirects to /dashboard if logged in)
- *  /showcase   → UI component showcase (development only)
- *  /dashboard  → protected via ProtectedRoute + AppLayout
- *  /resumes    → protected via ProtectedRoute + AppLayout
- *  /jobs       → protected via ProtectedRoute + AppLayout
- *  /history    → protected via ProtectedRoute + AppLayout
- *  /roadmap    → protected via ProtectedRoute + AppLayout
- *  /profile    → protected via ProtectedRoute + AppLayout
- *  /settings   → protected via ProtectedRoute + AppLayout
+ *  /                    → dynamic redirect (/dashboard if authenticated, else /login)
+ *  /login               → public only (redirects to /dashboard if logged in)
+ *  /register            → public only (redirects to /dashboard if logged in)
+ *  /showcase            → UI component showcase (development only)
+ *  /dashboard           → protected via ProtectedRoute + AppLayout
+ *  /resumes             → protected via ProtectedRoute + AppLayout
+ *  /jobs                → protected via ProtectedRoute + AppLayout
+ *  /jobs/:id/analysis   → protected via ProtectedRoute + AppLayout (Day 17)
+ *  /history             → protected via ProtectedRoute + AppLayout
+ *  /roadmap             → protected via ProtectedRoute + AppLayout
+ *  /profile             → protected via ProtectedRoute + AppLayout
+ *  /settings            → protected via ProtectedRoute + AppLayout
  */
 function RootRedirect() {
   const { isAuthenticated, loading } = useAuth()
@@ -119,6 +121,16 @@ function App() {
           <ProtectedRoute>
             <AppLayout>
               <JobDescriptions />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/jobs/:id/analysis"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <JobAnalysis />
             </AppLayout>
           </ProtectedRoute>
         }

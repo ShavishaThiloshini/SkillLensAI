@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   FileText,
   UploadCloud,
@@ -20,6 +21,7 @@ import {
   Wrench,
   Code2,
   AlertTriangle,
+  ExternalLink,
 } from 'lucide-react'
 import Button from '../components/common/Button'
 import Card, { CardBody, CardHeader } from '../components/common/Card'
@@ -61,6 +63,8 @@ function formatDate(dateStr) {
 }
 
 export default function JobDescriptions() {
+  const navigate = useNavigate()
+
   // Navigation / active input mode
   const [activeTab, setActiveTab] = useState('paste') // 'paste' | 'upload'
 
@@ -408,7 +412,7 @@ export default function JobDescriptions() {
             <h1 className={styles.title}>Job Descriptions</h1>
             <span className={styles.taglineBadge}>
               <Sparkles size={13} />
-              Day 16: Job Requirements
+              Day 17: Job Analysis
             </span>
           </div>
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-indigo-dark)', fontWeight: 600 }}>
@@ -785,14 +789,24 @@ export default function JobDescriptions() {
                   {formatDate(job.created_at)}
                 </span>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleViewDetails(job.id)}
-                >
-                  <Sparkles size={14} color="var(--color-indigo)" />
-                  Requirements & Details
-                </Button>
+                <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleViewDetails(job.id)}
+                  >
+                    <Sparkles size={14} color="var(--color-indigo)" />
+                    Details
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/jobs/${job.id}/analysis`)}
+                  >
+                    <ExternalLink size={14} color="var(--color-indigo)" />
+                    View Analysis
+                  </Button>
+                </div>
               </div>
             </div>
           ))}
@@ -1386,6 +1400,18 @@ export default function JobDescriptions() {
 
             {/* Modal Footer Actions */}
             <div className={styles.modalFooter}>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  setIsModalOpen(false)
+                  navigate(`/jobs/${selectedJob.id}/analysis`)
+                }}
+              >
+                <ExternalLink size={14} />
+                View Full Analysis
+              </Button>
+
               <Button
                 variant="outline"
                 size="sm"
