@@ -2387,6 +2387,10 @@ Requirements:
     assert.strictEqual(techNames.filter((n) => n === "PostgreSQL").length, 1, "PostgreSQL must appear exactly once");
   });
 
+  // ---- Day 18: AI Integration Tests ----
+  const { runAiTests } = require("./aiTests");
+  await runAiTests(testAsync);
+
   // Cleanup temp files
   try {
     fs.rmSync(testDir, { recursive: true, force: true });

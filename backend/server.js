@@ -34,10 +34,12 @@ app.use(express.json());
 // Routes
 const resumeRoutes = require("./routes/resumeRoutes");
 const jobRoutes = require("./routes/jobRoutes");
+const aiRoutes = require("./routes/aiRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/resumes", resumeRoutes);
 app.use("/api/job-descriptions", jobRoutes);
+app.use("/api/ai", aiRoutes);
 
 app.get("/api/health", async (req, res) => {
   try {

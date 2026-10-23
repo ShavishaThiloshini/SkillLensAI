@@ -6,6 +6,7 @@ import Register from './pages/Register'
 import ResumeDashboard from './pages/ResumeDashboard'
 import JobDescriptions from './pages/JobDescriptions'
 import JobAnalysis from './pages/JobAnalysis'
+import Settings from './pages/Settings'
 import { ProtectedRoute, PublicOnlyRoute } from './components/common/ProtectedRoute'
 import { useAuth } from './context/useAuth'
 
@@ -170,7 +171,7 @@ function App() {
         element={
           <ProtectedRoute>
             <AppLayout>
-              <PlaceholderPage title="Settings" />
+              <Settings />
             </AppLayout>
           </ProtectedRoute>
         }
