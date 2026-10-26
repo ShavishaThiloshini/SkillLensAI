@@ -9,6 +9,8 @@ const {
   parseResume,
   deleteResume,
   replaceResume,
+  extractResumeSkills,
+  getResumeSkills,
 } = require("../controllers/resumeController");
 const authenticateToken = require("../middleware/authMiddleware");
 const {
@@ -39,6 +41,13 @@ router.post("/:id/extract", extractResume);
 
 // Day 12: Trigger structured parsing and validation directly for a stored resume
 router.post("/:id/parse", parseResume);
+
+// Day 19: Extract technical skills from resume using AI service with deterministic fallback
+router.post("/:id/skills/extract", extractResumeSkills);
+router.post("/:id/extract-skills", extractResumeSkills);
+
+// Day 19: Retrieve saved extracted skills for a stored resume
+router.get("/:id/skills", getResumeSkills);
 
 module.exports = router;
 

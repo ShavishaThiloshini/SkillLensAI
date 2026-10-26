@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const db = require("../config/db");
 const ResumeService = require("../services/resumeService");
+const SkillExtractionService = require("../services/skillExtractionService");
 const { validateResumeFile } = require("../utils/fileValidator");
 
 /**
@@ -395,6 +396,86 @@ async function replaceResume(req, res) {
   }
 }
 
+/**
+ * POST /api/resumes/:id/extract-skills or POST /api/resumes/:id/skills/extract
+ * Day 19: AI-powered skill extraction from saved resume text with deterministic fallback.
+ */
+async function extractResumeSkills(req, res) {
+  const userId = req.user?.id;
+  const resumeId = Number(req.params.id);
+
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      message: "Authentication required.",
+    });
+  }
+
+  if (!resumeId || Number.isNaN(resumeId)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid resume ID.",
+    });
+  }
+
+  try {
+    const forceFallback = req.body?.forceFallback === true;
+    const result = await SkillExtractionService.extractResumeSkills(resumeId, userId, { forceFallback });
+
+    return res.status(200).json({
+      success: true,
+      message: "Resume skills extracted and normalized successfully.",
+      data: result,
+    });
+  } catch (error) {
+    console.error("[ResumeController] Error extracting resume skills:", error.message);
+    const status = error.status || 500;
+    return res.status(status).json({
+      success: false,
+      message: error.message || "Failed to extract skills from resume.",
+    });
+  }
+}
+
+/**
+ * GET /api/resumes/:id/skills
+ * Day 19: Retrieves saved extracted skills for a specific resume.
+ */
+async function getResumeSkills(req, res) {
+  const userId = req.user?.id;
+  const resumeId = Number(req.params.id);
+
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      message: "Authentication required.",
+    });
+  }
+
+  if (!resumeId || Number.isNaN(resumeId)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid resume ID.",
+    });
+  }
+
+  try {
+    const result = await SkillExtractionService.getResumeSkills(resumeId, userId);
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error("[ResumeController] Error retrieving resume skills:", error.message);
+    const status = error.status || 500;
+    return res.status(status).json({
+      success: false,
+      message: error.message || "Failed to retrieve resume skills.",
+    });
+  }
+}
+
 module.exports = {
   uploadResume,
   getUserResumes,
@@ -403,5 +484,8 @@ module.exports = {
   parseResume,
   deleteResume,
   replaceResume,
+  extractResumeSkills,
+  getResumeSkills,
 };
+
 

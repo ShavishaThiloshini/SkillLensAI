@@ -111,6 +111,30 @@ export async function replaceResume(id, file, onUploadProgress) {
   return response.data
 }
 
+/**
+ * Triggers Day 19 AI-powered skill extraction for a stored resume.
+ *
+ * @param {number|string} id - Resume ID
+ * @param {Object} [options]
+ * @param {boolean} [options.forceFallback] - Force deterministic fallback
+ * @returns {Promise<{ success: boolean, message: string, data: Object }>}
+ */
+export async function extractResumeSkills(id, options = {}) {
+  const response = await api.post(`/resumes/${id}/skills/extract`, options)
+  return response.data
+}
+
+/**
+ * Retrieves saved extracted skills for a stored resume (Day 19).
+ *
+ * @param {number|string} id - Resume ID
+ * @returns {Promise<{ success: boolean, data: Object }>}
+ */
+export async function getResumeSkills(id) {
+  const response = await api.get(`/resumes/${id}/skills`)
+  return response.data
+}
+
 export default {
   uploadResume,
   getResumes,
@@ -119,5 +143,8 @@ export default {
   parseResume,
   deleteResume,
   replaceResume,
+  extractResumeSkills,
+  getResumeSkills,
 }
+
 

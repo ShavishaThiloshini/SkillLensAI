@@ -2391,6 +2391,10 @@ Requirements:
   const { runAiTests } = require("./aiTests");
   await runAiTests(testAsync);
 
+  // ---- Day 19: Skill Extraction & Normalization Tests ----
+  const { runDay19SkillTests } = require("./day19SkillExtractionTests");
+  await runDay19SkillTests(testAsync);
+
   // Cleanup temp files
   try {
     fs.rmSync(testDir, { recursive: true, force: true });

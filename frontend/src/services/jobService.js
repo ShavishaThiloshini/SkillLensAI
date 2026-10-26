@@ -100,6 +100,31 @@ export async function getJobRequirements(id) {
   return response.data
 }
 
+/**
+ * Triggers Day 19 AI-powered skill extraction for a saved job description.
+ * Preserves required vs preferred classifications.
+ *
+ * @param {number|string} id - Job description ID
+ * @param {Object} [options]
+ * @param {boolean} [options.forceFallback] - Force deterministic fallback
+ * @returns {Promise<{ success: boolean, message: string, data: Object }>}
+ */
+export async function extractJobSkills(id, options = {}) {
+  const response = await api.post(`/job-descriptions/${id}/skills/extract`, options)
+  return response.data
+}
+
+/**
+ * Retrieves saved extracted skills for a job description (Day 19).
+ *
+ * @param {number|string} id - Job description ID
+ * @returns {Promise<{ success: boolean, data: Object }>}
+ */
+export async function getJobSkills(id) {
+  const response = await api.get(`/job-descriptions/${id}/skills`)
+  return response.data
+}
+
 export default {
   createJobDescription,
   uploadJobDescription,
@@ -107,4 +132,7 @@ export default {
   getJobDescriptionById,
   extractJobRequirements,
   getJobRequirements,
+  extractJobSkills,
+  getJobSkills,
 }
+

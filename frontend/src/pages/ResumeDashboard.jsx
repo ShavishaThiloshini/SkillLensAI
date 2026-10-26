@@ -7,7 +7,6 @@ import {
   RefreshCw,
   Eye,
   FileCheck,
-  Clock,
   Sparkles,
   X,
   Play,
@@ -25,10 +24,8 @@ import {
   AlertTriangle,
   AlignLeft,
   Trash2,
-  ArrowUpDown,
   Search,
   ChevronLeft,
-  ChevronRight,
   History,
   FileEdit,
 } from 'lucide-react'
@@ -43,6 +40,7 @@ import {
   extractResume,
   deleteResume,
   replaceResume,
+  extractResumeSkills,
 } from '../services/resumeService'
 import styles from './Resume.module.css'
 
@@ -96,6 +94,13 @@ export default function ResumeDashboard() {
   const [isExtracting, setIsExtracting] = useState(false)
   const [extractionError, setExtractionError] = useState('')
   const [extractionSuccess, setExtractionSuccess] = useState('')
+
+  // Day 19: Resume Skill Extraction state
+  const [isExtractingSkills, setIsExtractingSkills] = useState(false)
+  const [skillExtractionMetadata, setSkillExtractionMetadata] = useState(null)
+  const [skillExtractionError, setSkillExtractionError] = useState('')
+  const [skillExtractionSuccess, setSkillExtractionSuccess] = useState('')
+  const [selectedSkillCategory, setSelectedSkillCategory] = useState('ALL')
 
   // Delete Modal state
   const [resumeToDelete, setResumeToDelete] = useState(null)
@@ -261,6 +266,40 @@ export default function ResumeDashboard() {
       setExtractionError(err.message || 'Failed to extract resume text.')
     } finally {
       setIsExtracting(false)
+    }
+  }
+
+  // Day 19: Handle dedicated skill extraction
+  const handleExtractResumeSkills = async (resumeId) => {
+    const targetId = resumeId || activeResume?.id
+    if (!targetId) return
+
+    setIsExtractingSkills(true)
+    setSkillExtractionError('')
+    setSkillExtractionSuccess('')
+
+    try {
+      const res = await extractResumeSkills(targetId)
+      if (res?.success && res.data) {
+        setSkillExtractionMetadata(res.data.extractionMetadata || null)
+        const methodLabel = res.data.extractionMetadata?.method === 'AI' ? 'AI Provider (gpt-4o-mini)' : 'Deterministic Engine'
+        setSkillExtractionSuccess(`Extracted ${res.data.skills?.length || 0} skills successfully via ${methodLabel}!`)
+
+        // Refresh full resume details to reflect persisted skills
+        const updated = await getResumeById(targetId)
+        if (updated?.success && updated.resume) {
+          setActiveResume(updated.resume)
+        }
+        await loadResumes()
+      } else {
+        setSkillExtractionError(res?.message || 'Failed to extract skills.')
+      }
+    } catch (err) {
+      setSkillExtractionError(
+        err.response?.data?.message || err.message || 'Unable to extract skills from resume. Please try again.'
+      )
+    } finally {
+      setIsExtractingSkills(false)
     }
   }
 
@@ -1242,22 +1281,151 @@ export default function ResumeDashboard() {
               </div>
             )}
 
-            {/* Tab: Skills */}
+            {/* Tab: Skills (Day 19: AI-Powered Skill Extraction & Normalization) */}
             {activeTab === 'skills' && (
               <div>
-                {skills.length === 0 ? (
-                  <p className={styles.notDetected}>No skills detected in this resume yet.</p>
-                ) : (
-                  <div className={styles.skillsList}>
-                    {skills.map((s, idx) => (
-                      <span key={idx} className={styles.skillPill} title={s.evidence || s.category}>
-                        <Code2 size={13} />
-                        {s.name}
-                        <small style={{ color: 'var(--color-text-muted)', fontSize: '10px' }}>
-                          ({s.category || 'General'})
-                        </small>
+                <div className={styles.skillExtractHeader}>
+                  <div className={styles.skillHeaderLeft}>
+                    <h3 className={styles.sectionTitle} style={{ fontSize: 'var(--text-base)' }}>
+                      Resume Skills ({skills.length})
+                    </h3>
+                    {skillExtractionMetadata?.method === 'AI' ? (
+                      <span className={styles.methodBadgeAi} title="Extracted using configured OpenAI gpt-4o-mini service">
+                        <Sparkles size={12} />
+                        AI Extracted
                       </span>
-                    ))}
+                    ) : skillExtractionMetadata?.method === 'FALLBACK_DETERMINISTIC' ? (
+                      <span className={styles.methodBadgeFallback} title="Extracted using deterministic fallback rules">
+                        Deterministic Fallback
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => handleExtractResumeSkills(activeResume?.id)}
+                    disabled={isExtractingSkills || activeResume?.processing_status === 'PROCESSING'}
+                    id="btn-extract-resume-skills"
+                  >
+                    {isExtractingSkills ? (
+                      <>
+                        <Spinner size="xs" />
+                        Extracting Skills…
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={14} />
+                        {skills.length > 0 ? 'Re-extract Skills' : 'Extract Skills'}
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {skillExtractionSuccess && (
+                  <div className={`${styles.alert} ${styles.alertSuccess}`} style={{ marginBottom: 'var(--space-3)' }} role="status">
+                    <CheckCircle2 size={16} />
+                    <span>{skillExtractionSuccess}</span>
+                  </div>
+                )}
+
+                {skillExtractionError && (
+                  <div className={`${styles.alert} ${styles.alertError}`} style={{ marginBottom: 'var(--space-3)' }} role="alert">
+                    <AlertCircle size={16} />
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: 0, fontWeight: 500 }}>{skillExtractionError}</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="xs"
+                      onClick={() => handleExtractResumeSkills(activeResume?.id)}
+                      id="btn-retry-resume-skills"
+                    >
+                      <RefreshCw size={12} />
+                      Retry
+                    </Button>
+                  </div>
+                )}
+
+                {skills.length === 0 ? (
+                  <div className={styles.emptySkillsContainer} role="status">
+                    <Code2 size={36} color="var(--color-indigo)" />
+                    <h4 className={styles.emptySkillsTitle}>No Technical Skills Extracted Yet</h4>
+                    <p className={styles.emptySkillsDesc}>
+                      Click the button below to analyze this resume's text and extract normalized technical skills, frameworks, languages, and tools.
+                    </p>
+                    <Button
+                      variant="primary"
+                      onClick={() => handleExtractResumeSkills(activeResume?.id)}
+                      disabled={isExtractingSkills}
+                      id="btn-empty-extract-skills"
+                    >
+                      <Sparkles size={15} />
+                      Extract Skills Now
+                    </Button>
+                  </div>
+                ) : (
+                  <div>
+                    {/* Category Filter Pills */}
+                    {(() => {
+                      const categories = Array.from(new Set(skills.map((s) => s.category || 'OTHER'))).sort()
+                      return (
+                        <div className={styles.skillFilterRow} role="tablist" aria-label="Filter skills by category">
+                          <button
+                            type="button"
+                            className={`${styles.filterPill} ${selectedSkillCategory === 'ALL' ? styles.filterPillActive : ''}`}
+                            onClick={() => setSelectedSkillCategory('ALL')}
+                          >
+                            All ({skills.length})
+                          </button>
+                          {categories.map((cat) => {
+                            const count = skills.filter((s) => (s.category || 'OTHER') === cat).length
+                            return (
+                              <button
+                                key={cat}
+                                type="button"
+                                className={`${styles.filterPill} ${selectedSkillCategory === cat ? styles.filterPillActive : ''}`}
+                                onClick={() => setSelectedSkillCategory(cat)}
+                              >
+                                {cat} ({count})
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )
+                    })()}
+
+                    {/* Filtered Skills Grid */}
+                    {(() => {
+                      const displayedSkills =
+                        selectedSkillCategory === 'ALL'
+                          ? skills
+                          : skills.filter((s) => (s.category || 'OTHER') === selectedSkillCategory)
+
+                      return (
+                        <div className={styles.skillsGrid}>
+                          {displayedSkills.map((s, idx) => (
+                            <div key={idx} className={styles.skillCardItem}>
+                              <div className={styles.skillCardTop}>
+                                <span className={styles.skillCardName}>
+                                  <Code2 size={15} color="var(--color-indigo)" />
+                                  {s.name}
+                                </span>
+                                <span className={styles.skillCardCategory}>
+                                  {s.category || 'OTHER'}
+                                </span>
+                              </div>
+
+                              {s.evidence && (
+                                <div className={styles.skillEvidenceText} title="Evidence snippet from resume">
+                                  "{s.evidence}"
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })()}
                   </div>
                 )}
               </div>

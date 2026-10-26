@@ -4,6 +4,7 @@ const db = require("../config/db");
 const { validateResumeFile } = require("../utils/fileValidator");
 const { extractDocumentText } = require("../utils/documentParser");
 const JobRequirementExtractionService = require("../services/jobRequirementExtractionService");
+const SkillExtractionService = require("../services/skillExtractionService");
 
 // Maximum allowed pasted text length (characters)
 const MAX_DESCRIPTION_LENGTH = 30000;
@@ -472,6 +473,87 @@ async function getJobRequirements(req, res) {
   }
 }
 
+/**
+ * POST /api/job-descriptions/:id/extract-skills or POST /api/job-descriptions/:id/skills/extract
+ * Day 19: AI-powered skill extraction for saved job description with deterministic fallback.
+ * Preserves required vs preferred classifications.
+ */
+async function extractJobSkills(req, res) {
+  const userId = req.user?.id;
+  const jobId = Number(req.params.id);
+
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      message: "Authentication required.",
+    });
+  }
+
+  if (!jobId || Number.isNaN(jobId)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid job description ID.",
+    });
+  }
+
+  try {
+    const forceFallback = req.body?.forceFallback === true;
+    const result = await SkillExtractionService.extractJobSkills(jobId, userId, { forceFallback });
+
+    return res.status(200).json({
+      success: true,
+      message: "Job skills extracted and normalized successfully.",
+      data: result,
+    });
+  } catch (error) {
+    console.error("[JobController] Error extracting job skills:", error.message);
+    const status = error.status || 500;
+    return res.status(status).json({
+      success: false,
+      message: error.message || "Failed to extract skills from job description.",
+    });
+  }
+}
+
+/**
+ * GET /api/job-descriptions/:id/skills
+ * Day 19: Retrieves saved extracted skills for a specific job description.
+ */
+async function getJobSkills(req, res) {
+  const userId = req.user?.id;
+  const jobId = Number(req.params.id);
+
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      message: "Authentication required.",
+    });
+  }
+
+  if (!jobId || Number.isNaN(jobId)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid job description ID.",
+    });
+  }
+
+  try {
+    const result = await SkillExtractionService.getJobSkills(jobId, userId);
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error("[JobController] Error retrieving job skills:", error.message);
+    const status = error.status || 500;
+    return res.status(status).json({
+      success: false,
+      message: error.message || "Failed to retrieve job skills.",
+    });
+  }
+}
+
 module.exports = {
   createJobDescription,
   uploadJobDescription,
@@ -479,6 +561,8 @@ module.exports = {
   getJobDescriptionById,
   extractRequirementsForJob,
   getJobRequirements,
+  extractJobSkills,
+  getJobSkills,
   MAX_DESCRIPTION_LENGTH,
   MAX_TITLE_LENGTH,
   MAX_COMPANY_LENGTH,

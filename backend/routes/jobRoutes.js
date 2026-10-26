@@ -8,6 +8,8 @@ const {
   getJobDescriptionById,
   extractRequirementsForJob,
   getJobRequirements,
+  extractJobSkills,
+  getJobSkills,
 } = require("../controllers/jobController");
 const authenticateToken = require("../middleware/authMiddleware");
 const {
@@ -35,5 +37,12 @@ router.post("/:id/extract-requirements", extractRequirementsForJob);
 
 // Retrieve saved extracted requirements for a job description
 router.get("/:id/requirements", getJobRequirements);
+
+// Day 19: Extract technical skills for a saved job description
+router.post("/:id/skills/extract", extractJobSkills);
+router.post("/:id/extract-skills", extractJobSkills);
+
+// Day 19: Retrieve saved extracted skills for a job description
+router.get("/:id/skills", getJobSkills);
 
 module.exports = router;

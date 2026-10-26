@@ -25,6 +25,8 @@ import {
   getJobDescriptionById,
   getJobRequirements,
   extractJobRequirements,
+  getJobSkills,
+  extractJobSkills,
 } from '../services/jobService'
 import styles from './JobAnalysis.module.css'
 
@@ -89,20 +91,41 @@ function SectionCard({ id, icon: Icon, iconClass, title, subtitle, badge, childr
 function SkillItem({ skill, isRequired }) {
   return (
     <li className={`${styles.skillItem} ${isRequired ? styles.skillItemRequired : styles.skillItemPreferred}`}>
-      <span
-        className={`${styles.skillIcon} ${isRequired ? styles.skillIconRequired : styles.skillIconPreferred}`}
-        aria-label={isRequired ? 'Required' : 'Preferred'}
-      >
-        {isRequired ? (
-          <CheckCircle2 size={16} />
-        ) : (
-          <Circle size={16} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
+        <span
+          className={`${styles.skillIcon} ${isRequired ? styles.skillIconRequired : styles.skillIconPreferred}`}
+          aria-label={isRequired ? 'Required' : 'Preferred'}
+        >
+          {isRequired ? (
+            <CheckCircle2 size={16} />
+          ) : (
+            <Circle size={16} />
+          )}
+        </span>
+        <span className={styles.skillName}>{skill.name}</span>
+        {skill.category && skill.category !== 'OTHER' && (
+          <span className={`${styles.skillTag} ${isRequired ? styles.skillTagRequired : styles.skillTagPreferred}`}>
+            {skill.category}
+          </span>
         )}
-      </span>
-      <span className={styles.skillName}>{skill.name}</span>
-      {skill.category && skill.category !== 'OTHER' && (
-        <span className={`${styles.skillTag} ${isRequired ? styles.skillTagRequired : styles.skillTagPreferred}`}>
-          {skill.category}
+      </div>
+      {skill.evidence && (
+        <span
+          style={{
+            fontSize: '11px',
+            color: 'var(--color-text-secondary)',
+            fontStyle: 'italic',
+            maxWidth: '320px',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            padding: '0.15rem 0.4rem',
+            background: 'var(--color-surface-2)',
+            borderRadius: 'var(--radius-sm)',
+          }}
+          title={skill.evidence}
+        >
+          "{skill.evidence}"
         </span>
       )}
     </li>
@@ -140,6 +163,7 @@ export default function JobAnalysis() {
   const [extractionError, setExtractionError] = useState('')
   const [extractionSuccess, setExtractionSuccess] = useState('')
   const [isExtracted, setIsExtracted] = useState(false)
+  const [jobSkillsMeta, setJobSkillsMeta] = useState(null)
 
   // ── Load job detail ────────────────────────────────────────────────────────
   const loadJob = useCallback(async () => {
@@ -168,19 +192,27 @@ export default function JobAnalysis() {
     }
   }, [jobId])
 
-  // ── Load saved requirements ────────────────────────────────────────────────
+  // ── Load saved requirements & skills ──────────────────────────────────────
   const loadRequirements = useCallback(async () => {
     if (!jobId || Number.isNaN(jobId)) return
     setIsLoadingReqs(true)
     setExtractionError('')
     try {
-      const data = await getJobRequirements(jobId)
-      if (data.success && data.extracted && data.requirements) {
-        setRequirements(data.requirements)
+      const [reqData, skillData] = await Promise.allSettled([
+        getJobRequirements(jobId),
+        getJobSkills(jobId),
+      ])
+
+      if (reqData.status === 'fulfilled' && reqData.value?.success && reqData.value.extracted && reqData.value.requirements) {
+        setRequirements(reqData.value.requirements)
         setIsExtracted(true)
       } else {
         setRequirements(null)
         setIsExtracted(false)
+      }
+
+      if (skillData.status === 'fulfilled' && skillData.value?.success && skillData.value.data) {
+        setJobSkillsMeta(skillData.value.data.extractionMetadata || null)
       }
     } catch (err) {
       // Silent fail; UI shows "not extracted" state instead
@@ -191,21 +223,32 @@ export default function JobAnalysis() {
     }
   }, [jobId])
 
-  // ── Extract requirements (trigger) ────────────────────────────────────────
+  // ── Extract requirements and skills (trigger) ────────────────────────────
   const handleExtract = useCallback(async () => {
     if (!jobId || Number.isNaN(jobId)) return
     setIsExtracting(true)
     setExtractionError('')
     setExtractionSuccess('')
     try {
-      const data = await extractJobRequirements(jobId)
-      if (data.success && data.requirements) {
-        setRequirements(data.requirements)
+      // Run both job requirements extraction and skill extraction
+      const [reqResult, skillResult] = await Promise.all([
+        extractJobRequirements(jobId),
+        extractJobSkills(jobId).catch((err) => {
+          console.warn('[JobAnalysis] Skill extraction fallback note:', err.message)
+          return null
+        }),
+      ])
+
+      if (reqResult.success && reqResult.requirements) {
+        setRequirements(reqResult.requirements)
         setIsExtracted(true)
-        setExtractionSuccess('Requirements extracted and saved successfully!')
+        if (skillResult?.success && skillResult.data) {
+          setJobSkillsMeta(skillResult.data.extractionMetadata || null)
+        }
+        setExtractionSuccess('Job requirements and skills extracted and saved successfully!')
         setTimeout(() => setExtractionSuccess(''), 6000)
       } else {
-        setExtractionError(data.message || 'Failed to extract requirements.')
+        setExtractionError(reqResult.message || 'Failed to extract requirements.')
       }
     } catch (err) {
       setExtractionError(
@@ -350,6 +393,17 @@ export default function JobAnalysis() {
             <span className={`${styles.metaPill} ${styles.metaPillSuccess}`}>
               <CheckCircle2 size={12} aria-hidden="true" />
               Requirements Extracted
+            </span>
+          )}
+          {jobSkillsMeta?.method === 'AI' && (
+            <span className={styles.metaPill} style={{ background: 'rgba(99, 102, 241, 0.12)', color: 'var(--color-indigo)' }}>
+              <Sparkles size={12} aria-hidden="true" />
+              AI Skills (gpt-4o-mini)
+            </span>
+          )}
+          {jobSkillsMeta?.method === 'FALLBACK_DETERMINISTIC' && (
+            <span className={styles.metaPill} style={{ background: 'rgba(14, 165, 233, 0.1)', color: '#0284c7' }}>
+              Deterministic Fallback
             </span>
           )}
         </div>
