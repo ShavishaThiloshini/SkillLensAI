@@ -122,6 +122,51 @@ async function initDb() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
   `;
 
+  const createAnalysesTableQuery = `
+    CREATE TABLE IF NOT EXISTS analyses (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      resume_id INT NOT NULL,
+      job_id INT NOT NULL,
+      overall_score DECIMAL(5,2) DEFAULT 0.00,
+      skill_score DECIMAL(5,2) DEFAULT 0.00,
+      experience_score DECIMAL(5,2) NULL,
+      education_score DECIMAL(5,2) NULL,
+      certification_score DECIMAL(5,2) NULL,
+      summary TEXT NULL,
+      status ENUM('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED') NOT NULL DEFAULT 'COMPLETED',
+      ai_model VARCHAR(100) NULL,
+      algorithm_version VARCHAR(20) DEFAULT '1.0',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      completed_at TIMESTAMP NULL,
+      INDEX idx_analyses_user_id (user_id),
+      INDEX idx_analyses_resume_job (resume_id, job_id),
+      CONSTRAINT fk_analyses_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      CONSTRAINT fk_analyses_resume FOREIGN KEY (resume_id) REFERENCES resumes(id) ON DELETE CASCADE,
+      CONSTRAINT fk_analyses_job FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `;
+
+  const createSkillMatchesTableQuery = `
+    CREATE TABLE IF NOT EXISTS skill_matches (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      analysis_id INT NOT NULL,
+      skill_id INT NOT NULL,
+      status ENUM('STRONG_MATCH', 'PARTIAL_MATCH', 'MISSING') NOT NULL,
+      requirement_type ENUM('REQUIRED', 'PREFERRED', 'UNSPECIFIED') NOT NULL DEFAULT 'REQUIRED',
+      match_score DECIMAL(5,2) NULL,
+      priority ENUM('HIGH', 'MEDIUM', 'LOW') NULL,
+      explanation TEXT NULL,
+      evidence TEXT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_sm_analysis_id (analysis_id),
+      INDEX idx_sm_skill_id (skill_id),
+      INDEX idx_sm_status (status),
+      CONSTRAINT fk_sm_analysis FOREIGN KEY (analysis_id) REFERENCES analyses(id) ON DELETE CASCADE,
+      CONSTRAINT fk_sm_skill FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `;
+
   try {
     await db.query(createUsersTableQuery);
     console.log("[DB] `users` table verified/created successfully.");
@@ -146,6 +191,12 @@ async function initDb() {
 
     await db.query(createJobSkillsTableQuery);
     console.log("[DB] `job_skills` table verified/created successfully.");
+
+    await db.query(createAnalysesTableQuery);
+    console.log("[DB] `analyses` table verified/created successfully.");
+
+    await db.query(createSkillMatchesTableQuery);
+    console.log("[DB] `skill_matches` table verified/created successfully.");
 
     return true;
   } catch (error) {

@@ -6,6 +6,7 @@ import Register from './pages/Register'
 import ResumeDashboard from './pages/ResumeDashboard'
 import JobDescriptions from './pages/JobDescriptions'
 import JobAnalysis from './pages/JobAnalysis'
+import SkillMatching from './pages/SkillMatching'
 import Settings from './pages/Settings'
 import { ProtectedRoute, PublicOnlyRoute } from './components/common/ProtectedRoute'
 import { useAuth } from './context/useAuth'
@@ -132,6 +133,16 @@ function App() {
           <ProtectedRoute>
             <AppLayout>
               <JobAnalysis />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/matching"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <SkillMatching />
             </AppLayout>
           </ProtectedRoute>
         }

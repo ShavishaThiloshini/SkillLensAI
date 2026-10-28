@@ -353,7 +353,17 @@ export default function JobAnalysis() {
 
           <div className={styles.pageHeaderActions}>
             <Button
-              variant={isExtracted ? 'outline' : 'primary'}
+              as={Link}
+              to={`/matching?jobId=${job.id}`}
+              variant="primary"
+              size="sm"
+              id="btn-match-with-resume"
+            >
+              <Sparkles size={14} />
+              Match with Resume
+            </Button>
+            <Button
+              variant={isExtracted ? 'outline' : 'secondary'}
               size="sm"
               onClick={handleExtract}
               disabled={isExtracting || isLoadingReqs}
