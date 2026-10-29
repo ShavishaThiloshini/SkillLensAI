@@ -2399,6 +2399,10 @@ Requirements:
   const { runDay20SkillMatchingTests } = require("./day20SkillMatchingTests");
   await runDay20SkillMatchingTests(testAsync);
 
+  // ---- Day 21: Match Score Calculation Tests ----
+  const { runDay21MatchScoreTests } = require("./day21MatchScoreTests");
+  await runDay21MatchScoreTests(testAsync);
+
   // Cleanup temp files
   try {
     fs.rmSync(testDir, { recursive: true, force: true });

@@ -647,3 +647,491 @@
   align-items: center;
   gap: var(--space-1);
 }
+
+/* ==========================================================================
+   DAY 21: MATCH SCORE DASHBOARD STYLES
+   ========================================================================== */
+
+.matchScoreSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+/* ── Hero Card ──────────────────────────────────────────────────────────── */
+.matchScoreHero {
+  background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+  color: var(--color-white);
+  border-radius: var(--radius-2xl);
+  padding: var(--space-8);
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.25), 0 8px 10px -6px rgba(15, 23, 42, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+  position: relative;
+  overflow: hidden;
+}
+
+.matchScoreHero::after {
+  content: '';
+  position: absolute;
+  top: -40%;
+  right: -10%;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+@media (max-width: 840px) {
+  .matchScoreHero {
+    flex-direction: column;
+    text-align: center;
+    padding: var(--space-6);
+  }
+}
+
+.heroContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 580px;
+  z-index: 1;
+}
+
+.heroHeaderRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 840px) {
+  .heroHeaderRow {
+    justify-content: center;
+  }
+}
+
+.heroBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.heroBadgeStrong {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34D399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.heroBadgeGood {
+  background: rgba(99, 102, 241, 0.2);
+  color: #A5B4FC;
+  border: 1px solid rgba(99, 102, 241, 0.4);
+}
+
+.heroBadgeModerate {
+  background: rgba(245, 158, 11, 0.2);
+  color: #FCD34D;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.heroBadgeNeedsDev {
+  background: rgba(239, 68, 68, 0.2);
+  color: #FCA5A5;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.heroTitle {
+  font-size: var(--text-3xl);
+  font-weight: var(--font-bold);
+  color: var(--color-white);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.heroSubtitle {
+  font-size: var(--text-sm);
+  color: #94A3B8;
+  line-height: var(--leading-relaxed);
+  margin: 0;
+}
+
+.heroMetadata {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--text-xs);
+  color: #64748B;
+  flex-wrap: wrap;
+  margin-top: var(--space-1);
+}
+
+@media (max-width: 840px) {
+  .heroMetadata {
+    justify-content: center;
+  }
+}
+
+.heroGaugeBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.gaugeCircle {
+  position: relative;
+  width: 140px;
+  height: 140px;
+}
+
+.gaugeSvg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.gaugeBackground {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 10;
+}
+
+.gaugeProgress {
+  fill: none;
+  stroke-width: 10;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1s ease-in-out;
+}
+
+.gaugeProgressStrong {
+  stroke: #10B981;
+}
+
+.gaugeProgressGood {
+  stroke: #6366F1;
+}
+
+.gaugeProgressModerate {
+  stroke: #F59E0B;
+}
+
+.gaugeProgressNeedsDev {
+  stroke: #EF4444;
+}
+
+.gaugeTextContainer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.gaugeValue {
+  font-size: var(--text-3xl);
+  font-weight: var(--font-extrabold);
+  color: var(--color-white);
+  line-height: 1;
+}
+
+.gaugeLabel {
+  font-size: 0.6875rem;
+  font-weight: var(--font-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: #94A3B8;
+  margin-top: 0.25rem;
+}
+
+/* ── Category Breakdown Grid ────────────────────────────────────────────── */
+.breakdownSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.breakdownTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.breakdownTitle {
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  color: var(--color-navy);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.breakdownGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-5);
+}
+
+@media (max-width: 900px) {
+  .breakdownGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.scoreCard {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-4);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.scoreCard:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.scoreCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.scoreCardTitleBox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.scoreCardIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.iconSkills {
+  background: var(--color-indigo-50);
+  color: var(--color-indigo);
+}
+
+.iconExp {
+  background: #EFF6FF;
+  color: #2563EB;
+}
+
+.iconEdu {
+  background: #FDF4FF;
+  color: #9333EA;
+}
+
+.scoreCardName {
+  font-size: var(--text-sm);
+  font-weight: var(--font-bold);
+  color: var(--color-navy);
+  margin: 0;
+}
+
+.scoreBadge {
+  font-size: 0.6875rem;
+  font-weight: var(--font-semibold);
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-md);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+}
+
+.scoreBadgeAvailable {
+  background: var(--color-emerald-50);
+  color: var(--color-emerald-dark);
+  border: 1px solid var(--color-emerald-100);
+}
+
+.scoreBadgeNa {
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.scoreBadgeInsufficient {
+  background: var(--color-amber-50);
+  color: var(--color-amber-dark);
+  border: 1px solid var(--color-amber-100);
+}
+
+.scoreCardNumberRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.scoreCardScore {
+  font-size: 2.25rem;
+  font-weight: var(--font-extrabold);
+  color: var(--color-navy);
+  line-height: 1;
+}
+
+.scoreCardScoreNa {
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  color: var(--color-text-muted);
+  line-height: 1;
+}
+
+.scoreCardWeight {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-weight: var(--font-medium);
+}
+
+.scoreProgressBar {
+  width: 100%;
+  height: 8px;
+  background: var(--color-surface-2);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  position: relative;
+}
+
+.scoreProgressFill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fillSkills {
+  background: linear-gradient(90deg, #6366F1 0%, #4F46E5 100%);
+}
+
+.fillExp {
+  background: linear-gradient(90deg, #3B82F6 0%, #2563EB 100%);
+}
+
+.fillEdu {
+  background: linear-gradient(90deg, #A855F7 0%, #9333EA 100%);
+}
+
+.scoreCardExplanation {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  line-height: var(--leading-relaxed);
+  margin: 0;
+  flex-grow: 1;
+}
+
+/* ── Methodology Box ─────────────────────────────────────────────────────── */
+.methodologyCard {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.methodologyHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.methodologyTitle {
+  font-size: var(--text-sm);
+  font-weight: var(--font-bold);
+  color: var(--color-navy);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.methodologyDetails {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  line-height: var(--leading-relaxed);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
+}
+
+.weightsTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: var(--space-2);
+}
+
+.weightsTable th,
+.weightsTable td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.weightsTable th {
+  font-weight: var(--font-bold);
+  color: var(--color-navy);
+  background: var(--color-surface-2);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+}
+
+/* ── Warning Box ─────────────────────────────────────────────────────────── */
+.warningsCard {
+  background: var(--color-amber-50);
+  border: 1px solid var(--color-amber-200);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  color: var(--color-amber-900);
+  font-size: var(--text-xs);
+  line-height: var(--leading-relaxed);
+}
+
+.warningsCardIcon {
+  color: var(--color-amber-600);
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+

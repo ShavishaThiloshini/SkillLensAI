@@ -10,28 +10,41 @@ import {
   Briefcase,
   FileText,
   Layers,
-  ArrowRight,
   ShieldCheck,
   AlertCircle,
   HelpCircle,
-  ExternalLink,
+  GraduationCap,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+  Info,
+  Award,
 } from 'lucide-react'
 import Button from '../components/common/Button'
 import Spinner from '../components/common/Spinner'
 import { getResumes } from '../services/resumeService'
 import { getJobDescriptions } from '../services/jobService'
-import { runSkillMatching, getSavedSkillMatching } from '../services/matchingService'
+import {
+  runSkillMatching,
+  getSavedSkillMatching,
+  calculateMatchScore,
+  getSavedMatchScore,
+} from '../services/matchingService'
 import styles from './SkillMatching.module.css'
 
 /**
- * SkillLens AI — Day 20: Skill Matching Engine UI
+ * SkillLens AI — Day 21: Match Score Calculation & Skill Matching Dashboard
  *
- * Provides resume-to-job skill comparison:
- * - Select saved resume and saved job description
- * - Execute deterministic skill matching
- * - Display Strong Match (Green), Partial Match (Yellow), and Missing (Red)
- * - Preserve Required vs Preferred classifications
- * - View evidenced resume snippets and explainable rationale
+ * Workflow:
+ * Actual Resume Data + Actual Job Requirements
+ * ↓
+ * Day 20 Skill Matching Engine
+ * ↓
+ * Category Score Calculations (Skills, Experience, Education)
+ * ↓
+ * Overall Match Score with Normalized Weights
+ * ↓
+ * Match Score Dashboard
  */
 function SkillMatching() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -47,11 +60,13 @@ function SkillMatching() {
   const [isMatching, setIsMatching] = useState(false)
   const [errorMessage, setErrorMessage] = useState(null)
   const [validationWarning, setValidationWarning] = useState(null)
+  const [showMethodology, setShowMethodology] = useState(false)
 
-  // Matching results
+  // Matching & Scoring results
   const [matchData, setMatchData] = useState(null)
+  const [scoreData, setScoreData] = useState(null)
 
-  // Filter & search states
+  // Filter & search states for Day 20 skills section
   const [activeTab, setActiveTab] = useState('ALL')
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -93,15 +108,22 @@ function SkillMatching() {
       setSelectedResumeId(initialResume)
       setSelectedJobId(initialJob)
 
-      // If both were specified in query params, attempt to load saved results
+      // If both were specified or selected, attempt to load saved results
       if (initialResume && initialJob) {
         try {
-          const savedResult = await getSavedSkillMatching(initialResume, initialJob)
-          if (savedResult?.data) {
-            setMatchData(savedResult.data)
+          const [savedScore, savedSkills] = await Promise.all([
+            getSavedMatchScore(initialResume, initialJob).catch(() => null),
+            getSavedSkillMatching(initialResume, initialJob).catch(() => null),
+          ])
+
+          if (savedScore?.data) {
+            setScoreData(savedScore.data)
+          }
+          if (savedSkills?.data) {
+            setMatchData(savedSkills.data)
           }
         } catch (_) {
-          // No saved result yet, user can click "Run Matching"
+          // No saved result yet, user can click "Calculate Match Score"
         }
       }
     } catch (err) {
@@ -120,6 +142,8 @@ function SkillMatching() {
     const val = e.target.value
     setSelectedResumeId(val)
     setValidationWarning(null)
+    setScoreData(null)
+    setMatchData(null)
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev)
       if (val) next.set('resumeId', val)
@@ -132,6 +156,8 @@ function SkillMatching() {
     const val = e.target.value
     setSelectedJobId(val)
     setValidationWarning(null)
+    setScoreData(null)
+    setMatchData(null)
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev)
       if (val) next.set('jobId', val)
@@ -140,10 +166,10 @@ function SkillMatching() {
     })
   }
 
-  // 2. Trigger skill matching
-  const handleRunMatching = async () => {
+  // 2. Trigger Day 21 Match Score Calculation & Day 20 Skill Matching
+  const handleCalculateMatch = async () => {
     if (!selectedResumeId || !selectedJobId) {
-      setValidationWarning('Please select both a resume and a job description to compare.')
+      setValidationWarning('Please select both a resume and a job description to calculate match score.')
       return
     }
 
@@ -152,24 +178,36 @@ function SkillMatching() {
     setErrorMessage(null)
 
     try {
-      const response = await runSkillMatching({
-        resumeId: selectedResumeId,
-        jobDescriptionId: selectedJobId,
-      })
+      // Execute score calculation and skill matching concurrently
+      const [scoreResponse, matchingResponse] = await Promise.all([
+        calculateMatchScore({
+          resumeId: selectedResumeId,
+          jobDescriptionId: selectedJobId,
+        }),
+        runSkillMatching({
+          resumeId: selectedResumeId,
+          jobDescriptionId: selectedJobId,
+        }),
+      ])
 
-      if (response?.data) {
-        setMatchData(response.data)
+      if (scoreResponse?.data) {
+        setScoreData(scoreResponse.data)
       } else {
-        throw new Error('Unexpected response format from skill matching service.')
+        throw new Error('Unexpected response format from match score service.')
+      }
+
+      if (matchingResponse?.data) {
+        setMatchData(matchingResponse.data)
       }
     } catch (err) {
-      setErrorMessage(err.message || 'Failed to execute skill matching comparison.')
+      console.error('[SkillMatching] Error calculating match:', err)
+      setErrorMessage(err.message || 'Failed to calculate match score. Please check requirements.')
     } finally {
       setIsMatching(false)
     }
   }
 
-  // 3. Filtered & searched results
+  // 3. Filtered & searched skills results
   const filteredResults = useMemo(() => {
     if (!matchData?.results) return []
 
@@ -209,6 +247,15 @@ function SkillMatching() {
     }
   }, [matchData])
 
+  // Helper for overall score tier
+  const getOverallTier = (score) => {
+    if (score === null || score === undefined) return { label: 'Not Available', class: styles.heroBadgeModerate }
+    if (score >= 80) return { label: 'Strong Alignment', class: styles.heroBadgeStrong, gaugeClass: styles.gaugeProgressStrong }
+    if (score >= 65) return { label: 'Good Match', class: styles.heroBadgeGood, gaugeClass: styles.gaugeProgressGood }
+    if (score >= 50) return { label: 'Moderate Match', class: styles.heroBadgeModerate, gaugeClass: styles.gaugeProgressModerate }
+    return { label: 'Needs Development', class: styles.heroBadgeNeedsDev, gaugeClass: styles.gaugeProgressNeedsDev }
+  }
+
   // Render Initial Loading
   if (initialLoading) {
     return (
@@ -228,10 +275,10 @@ function SkillMatching() {
             <span className={styles.titleIcon}>
               <Sparkles size={22} />
             </span>
-            Skill Matching Engine
+            Match Score & Skill Analyzer
           </h1>
           <p className={styles.subtitle}>
-            Compare technical skills from your resume with requirements extracted from target job descriptions.
+            Calculate deterministic match scores across Skills, Experience, and Education between your resume and target jobs.
           </p>
         </div>
 
@@ -241,7 +288,7 @@ function SkillMatching() {
           </div>
           <h2 className={styles.stateTitle}>Prerequisites Required</h2>
           <p className={styles.stateMessage}>
-            To run the skill matching engine, you need at least one saved resume and one saved job description.
+            To calculate match scores, you need at least one saved resume and one saved job description.
           </p>
           <div className={styles.stateActions}>
             {resumes.length === 0 && (
@@ -262,16 +309,15 @@ function SkillMatching() {
     )
   }
 
-  const summary = matchData?.summary || {
-    totalJobSkills: 0,
-    strongMatches: 0,
-    partialMatches: 0,
-    missingSkills: 0,
-    requiredSkills: 0,
-    preferredSkills: 0,
-    requiredMatches: { strong: 0, partial: 0, missing: 0 },
-    preferredMatches: { strong: 0, partial: 0, missing: 0 },
-  }
+  const overallScoreVal = scoreData?.overall?.score ?? null
+  const overallTier = getOverallTier(overallScoreVal)
+
+  // Circular gauge calculations (radius = 56, circumference = 2 * PI * 56 ≈ 351.86)
+  const radius = 56
+  const circumference = 2 * Math.PI * radius
+  const strokeDashoffset = overallScoreVal !== null
+    ? circumference - (overallScoreVal / 100) * circumference
+    : circumference
 
   return (
     <div className={styles.page}>
@@ -282,34 +328,33 @@ function SkillMatching() {
             <span className={styles.titleIcon}>
               <Sparkles size={22} />
             </span>
-            Skill Matching Engine
+            Match Score & Skill Analyzer
           </h1>
-          {matchData && (
+          {scoreData && (
             <Button
               variant="outline"
               size="sm"
-              onClick={handleRunMatching}
+              onClick={handleCalculateMatch}
               disabled={isMatching}
             >
               <RefreshCw size={14} className={isMatching ? 'spin' : ''} />
-              Re-run Matching
+              Re-calculate Score
             </Button>
           )}
         </div>
         <p className={styles.subtitle}>
-          Evaluates actual extracted resume skills against target job description requirements,
-          categorizing every skill into Strong Match, Partial Match, or Missing.
+          Calculates explainable, deterministic alignment scores between candidate resume evidence and job requirements across Skills (50%), Experience (25%), and Education (15%).
         </p>
       </div>
 
-      {/* ── A. Selection Card ── */}
+      {/* ── Selection Card ── */}
       <section className={styles.selectionCard} aria-labelledby="selection-title">
         <div className={styles.selectionCardHeader}>
           <h2 className={styles.selectionCardTitle} id="selection-title">
             <Layers size={18} className="text-indigo" />
             Comparison Target Selection
           </h2>
-          <span className={styles.fieldHelper}>Step 1: Select Records → Step 2: Compare</span>
+          <span className={styles.fieldHelper}>Step 1: Select Records → Step 2: Calculate Match</span>
         </div>
 
         <div className={styles.selectionGrid}>
@@ -371,18 +416,18 @@ function SkillMatching() {
           <Button
             variant="primary"
             size="md"
-            onClick={handleRunMatching}
+            onClick={handleCalculateMatch}
             disabled={isMatching || !selectedResumeId || !selectedJobId}
           >
             {isMatching ? (
               <>
                 <Spinner size="sm" />
-                Comparing Skills...
+                Calculating Match Scores...
               </>
             ) : (
               <>
                 <Sparkles size={16} />
-                Run Skill Matching
+                Calculate Match Score
               </>
             )}
           </Button>
@@ -395,10 +440,10 @@ function SkillMatching() {
           <div className={`${styles.stateIcon} ${styles.stateIconRed}`}>
             <AlertCircle size={32} />
           </div>
-          <h2 className={styles.stateTitle}>Matching Comparison Failed</h2>
+          <h2 className={styles.stateTitle}>Calculation Failed</h2>
           <p className={styles.stateMessage}>{errorMessage}</p>
           <div className={styles.stateActions}>
-            <Button variant="primary" onClick={handleRunMatching}>
+            <Button variant="primary" onClick={handleCalculateMatch}>
               <RefreshCw size={14} />
               Try Again
             </Button>
@@ -407,111 +452,322 @@ function SkillMatching() {
       )}
 
       {/* ── Loading State ── */}
-      {isMatching && !matchData && (
+      {isMatching && !scoreData && (
         <div className={styles.stateContainer}>
           <Spinner size="lg" />
-          <h2 className={styles.stateTitle}>Analyzing Skill Overlap</h2>
+          <h2 className={styles.stateTitle}>Analyzing Resume & Job Alignment</h2>
           <p className={styles.stateMessage}>
-            Extracting and normalizing technical skills, resolving known technology aliases,
-            and evaluating evidence against job requirements...
+            Evaluating technical skills, merging non-overlapping work experience intervals,
+            comparing degree qualifications, and normalizing category weights...
           </p>
         </div>
       )}
 
-      {/* ── B & C: Matching Results ── */}
+      {/* ── DAY 21: MATCH SCORE DASHBOARD ── */}
+      {scoreData && !isMatching && (
+        <div className={styles.matchScoreSection}>
+          {/* A. Overall Match Hero */}
+          <div className={styles.matchScoreHero} role="region" aria-label="Overall Match Score">
+            <div className={styles.heroContent}>
+              <div className={styles.heroHeaderRow}>
+                <span className={`${styles.heroBadge} ${overallTier.class}`}>
+                  {overallTier.label}
+                </span>
+                <span className={styles.fieldHelper} style={{ color: '#94A3B8' }}>
+                  Algorithm v{scoreData.metadata?.algorithmVersion || '1.0'}
+                </span>
+              </div>
+
+              <h2 className={styles.heroTitle}>
+                Overall Match: {overallScoreVal !== null ? `${overallScoreVal}%` : 'Unavailable'}
+              </h2>
+
+              <p className={styles.heroSubtitle}>
+                {scoreData.overall?.explanation || 'Overall match calculated from applicable scoring categories.'}
+              </p>
+
+              <div className={styles.heroMetadata}>
+                <span>Target: <strong>{scoreData.jobTitle || 'Job Role'}</strong></span>
+                {scoreData.company && <span>Company: <strong>{scoreData.company}</strong></span>}
+                <span>Resume: <strong>{scoreData.resumeFilename}</strong></span>
+              </div>
+            </div>
+
+            {/* Circular Gauge */}
+            <div className={styles.heroGaugeBox} aria-label={`Overall compatibility score gauge: ${overallScoreVal !== null ? overallScoreVal + '%' : 'Unavailable'}`}>
+              <div className={styles.gaugeCircle}>
+                <svg className={styles.gaugeSvg} viewBox="0 0 140 140">
+                  <circle
+                    className={styles.gaugeBackground}
+                    cx="70"
+                    cy="70"
+                    r={radius}
+                  />
+                  <circle
+                    className={`${styles.gaugeProgress} ${overallTier.gaugeClass || ''}`}
+                    cx="70"
+                    cy="70"
+                    r={radius}
+                    strokeDasharray={circumference}
+                    strokeDashoffset={strokeDashoffset}
+                  />
+                </svg>
+                <div className={styles.gaugeTextContainer}>
+                  <span className={styles.gaugeValue}>
+                    {overallScoreVal !== null ? `${overallScoreVal}%` : '—'}
+                  </span>
+                  <span className={styles.gaugeLabel}>Overall</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* B. Category Breakdown Cards */}
+          <div className={styles.breakdownSection} role="region" aria-label="Category Breakdown">
+            <div className={styles.breakdownTitleRow}>
+              <h3 className={styles.breakdownTitle}>
+                <ShieldCheck size={20} className="text-indigo" />
+                Category Score Breakdown
+              </h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowMethodology(!showMethodology)}
+                aria-expanded={showMethodology}
+              >
+                <Info size={14} />
+                {showMethodology ? 'Hide Methodology' : 'View Methodology'}
+                {showMethodology ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </Button>
+            </div>
+
+            <div className={styles.breakdownGrid}>
+              {/* 1. Skills Match Card */}
+              <div className={styles.scoreCard}>
+                <div className={styles.scoreCardHeader}>
+                  <div className={styles.scoreCardTitleBox}>
+                    <div className={`${styles.scoreCardIcon} ${styles.iconSkills}`}>
+                      <Sparkles size={18} />
+                    </div>
+                    <h4 className={styles.scoreCardName}>Skills Match</h4>
+                  </div>
+                  <span className={`${styles.scoreBadge} ${scoreData.scores.skills.status === 'AVAILABLE' ? styles.scoreBadgeAvailable : styles.scoreBadgeNa}`}>
+                    {scoreData.scores.skills.status === 'AVAILABLE' ? 'Available' : 'Not Applicable'}
+                  </span>
+                </div>
+
+                <div className={styles.scoreCardNumberRow}>
+                  <div className={styles.scoreCardScore}>
+                    {scoreData.scores.skills.score !== null ? `${scoreData.scores.skills.score}%` : 'N/A'}
+                  </div>
+                  <div className={styles.scoreCardWeight}>
+                    Weight: {Math.round((scoreData.scores.skills.normalizedWeight || scoreData.scores.skills.weight) * 100)}%
+                  </div>
+                </div>
+
+                <div className={styles.scoreProgressBar} aria-hidden="true">
+                  <div
+                    className={`${styles.scoreProgressFill} ${styles.fillSkills}`}
+                    style={{ width: `${scoreData.scores.skills.score || 0}%` }}
+                  />
+                </div>
+
+                <p className={styles.scoreCardExplanation}>
+                  {scoreData.scores.skills.explanation}
+                </p>
+              </div>
+
+              {/* 2. Experience Match Card */}
+              <div className={styles.scoreCard}>
+                <div className={styles.scoreCardHeader}>
+                  <div className={styles.scoreCardTitleBox}>
+                    <div className={`${styles.scoreCardIcon} ${styles.iconExp}`}>
+                      <Clock size={18} />
+                    </div>
+                    <h4 className={styles.scoreCardName}>Experience Match</h4>
+                  </div>
+                  <span className={`${styles.scoreBadge} ${
+                    scoreData.scores.experience.status === 'AVAILABLE'
+                      ? styles.scoreBadgeAvailable
+                      : scoreData.scores.experience.status === 'INSUFFICIENT_DATA'
+                      ? styles.scoreBadgeInsufficient
+                      : styles.scoreBadgeNa
+                  }`}>
+                    {scoreData.scores.experience.status === 'AVAILABLE'
+                      ? 'Available'
+                      : scoreData.scores.experience.status === 'INSUFFICIENT_DATA'
+                      ? 'Insufficient Data'
+                      : 'Not Specified'}
+                  </span>
+                </div>
+
+                <div className={styles.scoreCardNumberRow}>
+                  <div className={scoreData.scores.experience.score !== null ? styles.scoreCardScore : styles.scoreCardScoreNa}>
+                    {scoreData.scores.experience.score !== null
+                      ? `${scoreData.scores.experience.score}%`
+                      : scoreData.scores.experience.status === 'INSUFFICIENT_DATA'
+                      ? 'Unavailable'
+                      : 'Not Specified'}
+                  </div>
+                  <div className={styles.scoreCardWeight}>
+                    {scoreData.scores.experience.normalizedWeight !== null
+                      ? `Weight: ${Math.round(scoreData.scores.experience.normalizedWeight * 100)}%`
+                      : 'Weight: Redistributed'}
+                  </div>
+                </div>
+
+                <div className={styles.scoreProgressBar} aria-hidden="true">
+                  <div
+                    className={`${styles.scoreProgressFill} ${styles.fillExp}`}
+                    style={{ width: `${scoreData.scores.experience.score || 0}%` }}
+                  />
+                </div>
+
+                <p className={styles.scoreCardExplanation}>
+                  {scoreData.scores.experience.explanation}
+                </p>
+              </div>
+
+              {/* 3. Education Match Card */}
+              <div className={styles.scoreCard}>
+                <div className={styles.scoreCardHeader}>
+                  <div className={styles.scoreCardTitleBox}>
+                    <div className={`${styles.scoreCardIcon} ${styles.iconEdu}`}>
+                      <GraduationCap size={18} />
+                    </div>
+                    <h4 className={styles.scoreCardName}>Education Match</h4>
+                  </div>
+                  <span className={`${styles.scoreBadge} ${
+                    scoreData.scores.education.status === 'AVAILABLE'
+                      ? styles.scoreBadgeAvailable
+                      : scoreData.scores.education.status === 'INSUFFICIENT_DATA'
+                      ? styles.scoreBadgeInsufficient
+                      : styles.scoreBadgeNa
+                  }`}>
+                    {scoreData.scores.education.status === 'AVAILABLE'
+                      ? 'Available'
+                      : scoreData.scores.education.status === 'INSUFFICIENT_DATA'
+                      ? 'Insufficient Data'
+                      : 'Not Specified'}
+                  </span>
+                </div>
+
+                <div className={styles.scoreCardNumberRow}>
+                  <div className={scoreData.scores.education.score !== null ? styles.scoreCardScore : styles.scoreCardScoreNa}>
+                    {scoreData.scores.education.score !== null
+                      ? `${scoreData.scores.education.score}%`
+                      : scoreData.scores.education.status === 'INSUFFICIENT_DATA'
+                      ? 'Unavailable'
+                      : 'Not Specified'}
+                  </div>
+                  <div className={styles.scoreCardWeight}>
+                    {scoreData.scores.education.normalizedWeight !== null
+                      ? `Weight: ${Math.round(scoreData.scores.education.normalizedWeight * 100)}%`
+                      : 'Weight: Redistributed'}
+                  </div>
+                </div>
+
+                <div className={styles.scoreProgressBar} aria-hidden="true">
+                  <div
+                    className={`${styles.scoreProgressFill} ${styles.fillEdu}`}
+                    style={{ width: `${scoreData.scores.education.score || 0}%` }}
+                  />
+                </div>
+
+                <p className={styles.scoreCardExplanation}>
+                  {scoreData.scores.education.explanation}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* C. Methodology & Transparency Box */}
+          {showMethodology && (
+            <div className={styles.methodologyCard} role="region" aria-label="Scoring Methodology Details">
+              <div className={styles.methodologyTitle}>
+                <Award size={18} className="text-indigo" />
+                Documented Scoring Methodology & Weight Normalization
+              </div>
+              <div className={styles.methodologyDetails}>
+                <p>
+                  Scores are calculated deterministically without artificial fabrication or random numbers.
+                  When a job requirement category (such as experience or education) is not specified by the employer,
+                  it is marked as <strong>Not Applicable</strong> and its baseline weight is redistributed proportionally across the applicable categories.
+                </p>
+                <table className={styles.weightsTable}>
+                  <thead>
+                    <tr>
+                      <th>Category</th>
+                      <th>Base Weight</th>
+                      <th>Status</th>
+                      <th>Normalized Weight</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Skills Match</td>
+                      <td>50%</td>
+                      <td>{scoreData.scores.skills.status}</td>
+                      <td><strong>{Math.round((scoreData.scores.skills.normalizedWeight || 0.5) * 100)}%</strong></td>
+                    </tr>
+                    <tr>
+                      <td>Experience Match</td>
+                      <td>25%</td>
+                      <td>{scoreData.scores.experience.status}</td>
+                      <td><strong>{scoreData.scores.experience.normalizedWeight ? `${Math.round(scoreData.scores.experience.normalizedWeight * 100)}%` : '0% (Redistributed)'}</strong></td>
+                    </tr>
+                    <tr>
+                      <td>Education Match</td>
+                      <td>15%</td>
+                      <td>{scoreData.scores.education.status}</td>
+                      <td><strong>{scoreData.scores.education.normalizedWeight ? `${Math.round(scoreData.scores.education.normalizedWeight * 100)}%` : '0% (Redistributed)'}</strong></td>
+                    </tr>
+                    <tr>
+                      <td>Certifications / Other</td>
+                      <td>10%</td>
+                      <td>NOT_APPLICABLE</td>
+                      <td><strong>0% (Redistributed)</strong></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* D. Warnings Alert if any */}
+          {scoreData.metadata?.warnings && scoreData.metadata.warnings.length > 0 && (
+            <div className={styles.warningsCard} role="alert">
+              <AlertTriangle size={18} className={styles.warningsCardIcon} />
+              <div>
+                <strong>Honest Data Notice:</strong>
+                <ul style={{ margin: '0.25rem 0 0 1rem', padding: 0 }}>
+                  {scoreData.metadata.warnings.map((w, idx) => (
+                    <li key={idx}>{w}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── DAY 20: DETAILED SKILL BREAKDOWN ── */}
       {matchData && !isMatching && (
         <>
-          {/* B. Summary Cards */}
-          <div className={styles.summaryGrid}>
-            {/* Total Job Skills */}
-            <div className={`${styles.summaryCard} ${styles.summaryCardTotal}`}>
-              <div className={styles.summaryCardHeader}>
-                <span className={styles.summaryCardLabel}>Evaluated Skills</span>
-                <span className={`${styles.summaryCardIconBox} ${styles.iconTotal}`}>
-                  <Layers size={18} />
-                </span>
-              </div>
-              <p className={styles.summaryCardValue}>{summary.totalJobSkills}</p>
-              <p className={styles.summaryCardSubtext}>
-                {summary.requiredSkills} Required • {summary.preferredSkills} Preferred
-              </p>
-            </div>
-
-            {/* Strong Matches */}
-            <div className={`${styles.summaryCard} ${styles.summaryCardStrong}`}>
-              <div className={styles.summaryCardHeader}>
-                <span className={styles.summaryCardLabel}>Strong Match</span>
-                <span className={`${styles.summaryCardIconBox} ${styles.iconStrong}`}>
-                  <CheckCircle2 size={18} />
-                </span>
-              </div>
-              <p className={styles.summaryCardValue}>{summary.strongMatches}</p>
-              <p className={styles.summaryCardSubtext}>
-                {summary.requiredMatches?.strong || 0} req • {summary.preferredMatches?.strong || 0} pref
-              </p>
-            </div>
-
-            {/* Partial Matches */}
-            <div className={`${styles.summaryCard} ${styles.summaryCardPartial}`}>
-              <div className={styles.summaryCardHeader}>
-                <span className={styles.summaryCardLabel}>Partial Match</span>
-                <span className={`${styles.summaryCardIconBox} ${styles.iconPartial}`}>
-                  <AlertTriangle size={18} />
-                </span>
-              </div>
-              <p className={styles.summaryCardValue}>{summary.partialMatches}</p>
-              <p className={styles.summaryCardSubtext}>
-                {summary.requiredMatches?.partial || 0} req • {summary.preferredMatches?.partial || 0} pref
-              </p>
-            </div>
-
-            {/* Missing Skills */}
-            <div className={`${styles.summaryCard} ${styles.summaryCardMissing}`}>
-              <div className={styles.summaryCardHeader}>
-                <span className={styles.summaryCardLabel}>Missing Skills</span>
-                <span className={`${styles.summaryCardIconBox} ${styles.iconMissing}`}>
-                  <XCircle size={18} />
-                </span>
-              </div>
-              <p className={styles.summaryCardValue}>{summary.missingSkills}</p>
-              <p className={styles.summaryCardSubtext}>
-                {summary.requiredMatches?.missing || 0} req • {summary.preferredMatches?.missing || 0} pref
-              </p>
-            </div>
+          {/* Section Divider / Title */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-6)', marginTop: 'var(--space-2)' }}>
+            <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-bold)', color: 'var(--color-navy)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Layers size={20} className="text-indigo" />
+              Detailed Skill Matching Breakdown
+            </h3>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+              {matchData.results?.length || 0} evaluated skills
+            </span>
           </div>
 
-          {/* Requirement Breakdown Bar */}
-          <div className={styles.breakdownBar}>
-            <div className={styles.breakdownGroup}>
-              <span className={styles.breakdownTitle}>Required Skills:</span>
-              <span className={`${styles.breakdownPill} ${styles.breakdownPillStrong}`}>
-                <CheckCircle2 size={12} /> {summary.requiredMatches?.strong || 0} Strong
-              </span>
-              <span className={`${styles.breakdownPill} ${styles.breakdownPillPartial}`}>
-                <AlertTriangle size={12} /> {summary.requiredMatches?.partial || 0} Partial
-              </span>
-              <span className={`${styles.breakdownPill} ${styles.breakdownPillMissing}`}>
-                <XCircle size={12} /> {summary.requiredMatches?.missing || 0} Missing
-              </span>
-            </div>
-
-            <div className={styles.breakdownGroup}>
-              <span className={styles.breakdownTitle}>Preferred Skills:</span>
-              <span className={`${styles.breakdownPill} ${styles.breakdownPillStrong}`}>
-                <CheckCircle2 size={12} /> {summary.preferredMatches?.strong || 0} Strong
-              </span>
-              <span className={`${styles.breakdownPill} ${styles.breakdownPillPartial}`}>
-                <AlertTriangle size={12} /> {summary.preferredMatches?.partial || 0} Partial
-              </span>
-              <span className={`${styles.breakdownPill} ${styles.breakdownPillMissing}`}>
-                <XCircle size={12} /> {summary.preferredMatches?.missing || 0} Missing
-              </span>
-            </div>
-          </div>
-
-          {/* Filter & Search Controls */}
+          {/* Filter Tabs & Search */}
           <div className={styles.controlsRow}>
-            <div className={styles.tabsList} role="tablist" aria-label="Filter skill matches">
+            <div className={styles.tabList} role="tablist" aria-label="Filter skills by match type">
               <button
                 type="button"
                 role="tab"
@@ -522,154 +778,157 @@ function SkillMatching() {
                 All Skills
                 <span className={styles.tabBadge}>{tabCounts.all}</span>
               </button>
+
               <button
                 type="button"
                 role="tab"
                 aria-selected={activeTab === 'STRONG'}
-                className={`${styles.tabBtn} ${activeTab === 'STRONG' ? styles.tabBtnActive : ''}`}
+                className={`${styles.tabBtn} ${styles.tabBtnStrong} ${activeTab === 'STRONG' ? styles.tabBtnActive : ''}`}
                 onClick={() => setActiveTab('STRONG')}
               >
-                Strong Match
+                <CheckCircle2 size={14} />
+                Strong
                 <span className={styles.tabBadge}>{tabCounts.strong}</span>
               </button>
+
               <button
                 type="button"
                 role="tab"
                 aria-selected={activeTab === 'PARTIAL'}
-                className={`${styles.tabBtn} ${activeTab === 'PARTIAL' ? styles.tabBtnActive : ''}`}
+                className={`${styles.tabBtn} ${styles.tabBtnPartial} ${activeTab === 'PARTIAL' ? styles.tabBtnActive : ''}`}
                 onClick={() => setActiveTab('PARTIAL')}
               >
-                Partial Match
+                <AlertTriangle size={14} />
+                Partial
                 <span className={styles.tabBadge}>{tabCounts.partial}</span>
               </button>
+
               <button
                 type="button"
                 role="tab"
                 aria-selected={activeTab === 'MISSING'}
-                className={`${styles.tabBtn} ${activeTab === 'MISSING' ? styles.tabBtnActive : ''}`}
+                className={`${styles.tabBtn} ${styles.tabBtnMissing} ${activeTab === 'MISSING' ? styles.tabBtnActive : ''}`}
                 onClick={() => setActiveTab('MISSING')}
               >
+                <XCircle size={14} />
                 Missing
                 <span className={styles.tabBadge}>{tabCounts.missing}</span>
               </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === 'REQUIRED'}
-                className={`${styles.tabBtn} ${activeTab === 'REQUIRED' ? styles.tabBtnActive : ''}`}
-                onClick={() => setActiveTab('REQUIRED')}
-              >
-                Required Only
-                <span className={styles.tabBadge}>{tabCounts.required}</span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === 'PREFERRED'}
-                className={`${styles.tabBtn} ${activeTab === 'PREFERRED' ? styles.tabBtnActive : ''}`}
-                onClick={() => setActiveTab('PREFERRED')}
-              >
-                Preferred Only
-                <span className={styles.tabBadge}>{tabCounts.preferred}</span>
-              </button>
             </div>
 
+            {/* Search Input */}
             <div className={styles.searchBox}>
-              <Search size={14} className={styles.searchIcon} />
+              <Search size={16} className={styles.searchIcon} />
               <input
-                type="search"
+                type="text"
                 className={styles.searchInput}
-                placeholder="Search evaluated skills..."
+                placeholder="Search skills or explanation..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                aria-label="Search skills"
+                aria-label="Search evaluated skills"
               />
             </div>
           </div>
 
-          {/* C. Match Results List */}
+          {/* Results List */}
           {filteredResults.length === 0 ? (
-            <div className={styles.stateContainer}>
-              <HelpCircle size={28} className="text-muted" />
-              <p className={styles.stateMessage}>
-                No skills match the active filter or search query.
-              </p>
+            <div className={styles.emptyFilteredState}>
+              <p>No skills match your active filter and search criteria.</p>
+              <Button variant="ghost" size="sm" onClick={() => { setActiveTab('ALL'); setSearchQuery('') }}>
+                Reset Filters
+              </Button>
             </div>
           ) : (
-            <div className={styles.resultsList}>
+            <div className={styles.skillsList} role="feed" aria-label="Matched skills list">
               {filteredResults.map((item, idx) => {
                 const isStrong = item.category === 'STRONG_MATCH'
                 const isPartial = item.category === 'PARTIAL_MATCH'
                 const isMissing = item.category === 'MISSING'
-
-                const cardClass = isStrong
-                  ? styles.matchCardStrong
-                  : isPartial
-                  ? styles.matchCardPartial
-                  : styles.matchCardMissing
-
-                const badgeCategoryClass = isStrong
-                  ? styles.badgeStrong
-                  : isPartial
-                  ? styles.badgePartial
-                  : styles.badgeMissing
-
                 const isRequired = item.requirementType === 'REQUIRED'
-                const isPreferred = item.requirementType === 'PREFERRED'
 
                 return (
-                  <div key={`${item.jobSkill}-${idx}`} className={`${styles.matchCard} ${cardClass}`}>
-                    <div className={styles.matchCardHeader}>
-                      <div className={styles.matchCardTitleBox}>
-                        <h3 className={styles.skillName}>{item.jobSkill}</h3>
-
-                        {/* Category Badge with Color & Icon */}
-                        <span className={`${styles.badgeCategory} ${badgeCategoryClass}`}>
-                          {isStrong && <CheckCircle2 size={13} aria-hidden="true" />}
-                          {isPartial && <AlertTriangle size={13} aria-hidden="true" />}
-                          {isMissing && <XCircle size={13} aria-hidden="true" />}
-                          <span>
-                            {isStrong && 'Strong Match'}
-                            {isPartial && 'Partial Match'}
-                            {isMissing && 'Missing'}
+                  <article
+                    key={`${item.jobSkill}-${idx}`}
+                    className={`${styles.skillMatchCard} ${
+                      isStrong
+                        ? styles.cardStrong
+                        : isPartial
+                        ? styles.cardPartial
+                        : styles.cardMissing
+                    }`}
+                  >
+                    <div className={styles.cardHeader}>
+                      <div className={styles.skillTitleGroup}>
+                        <h4 className={styles.skillName}>{item.jobSkill}</h4>
+                        {item.matchedSkill && item.matchedSkill !== item.jobSkill && (
+                          <span className={styles.matchedVia}>
+                            (matched via {item.matchedSkill})
                           </span>
-                        </span>
+                        )}
+                      </div>
 
-                        {/* Requirement Classification Badge */}
+                      <div className={styles.badgesGroup}>
+                        {/* Requirement Type Badge */}
                         <span
                           className={`${styles.badgeRequirement} ${
                             isRequired
                               ? styles.badgeReqRequired
-                              : isPreferred
+                              : item.requirementType === 'PREFERRED'
                               ? styles.badgeReqPreferred
                               : styles.badgeReqUnspecified
                           }`}
                         >
-                          {isRequired ? 'Required' : isPreferred ? 'Preferred' : 'Unspecified'}
+                          {item.requirementType || 'UNSPECIFIED'}
+                        </span>
+
+                        {/* Match Category Badge */}
+                        <span
+                          className={`${styles.badgeCategory} ${
+                            isStrong
+                              ? styles.badgeStrong
+                              : isPartial
+                              ? styles.badgePartial
+                              : styles.badgeMissing
+                          }`}
+                        >
+                          {isStrong ? (
+                            <>
+                              <CheckCircle2 size={12} />
+                              Strong Match
+                            </>
+                          ) : isPartial ? (
+                            <>
+                              <AlertTriangle size={12} />
+                              Partial Match
+                            </>
+                          ) : (
+                            <>
+                              <XCircle size={12} />
+                              Missing
+                            </>
+                          )}
                         </span>
                       </div>
                     </div>
 
                     {/* Explanation */}
-                    {item.explanation && (
-                      <p className={styles.explanationBox}>{item.explanation}</p>
-                    )}
+                    <p className={styles.explanationBox}>{item.explanation}</p>
 
-                    {/* Resume Evidence */}
+                    {/* Evidence Snippet */}
                     {item.resumeEvidence && item.resumeEvidence.length > 0 && (
                       <div className={styles.evidenceSection}>
                         <span className={styles.evidenceLabel}>
                           <ShieldCheck size={12} />
-                          Resume Evidence:
+                          Resume Evidence
                         </span>
-                        {item.resumeEvidence.map((ev, i) => (
-                          <p key={i} className={styles.evidenceText}>
+                        {item.resumeEvidence.map((ev, evIdx) => (
+                          <p key={evIdx} className={styles.evidenceText}>
                             "{ev}"
                           </p>
                         ))}
                       </div>
                     )}
-                  </div>
+                  </article>
                 )
               })}
             </div>
@@ -677,34 +936,18 @@ function SkillMatching() {
 
           {/* Meta Footer */}
           <div className={styles.metaFooter}>
-            <span className={styles.metaItem}>
-              Candidate Resume: <strong>{matchData.resumeFilename || 'Selected Resume'}</strong>
-            </span>
-            <span className={styles.metaItem}>
-              Target Job: <strong>{matchData.jobTitle || 'Selected Job'}</strong>
-            </span>
-            <span className={styles.metaItem}>
-              Algorithm: v{matchData.matchingMetadata?.algorithmVersion || '1.0'}
-            </span>
-            <span className={styles.metaItem}>
-              Matched At: {new Date(matchData.matchingMetadata?.matchedAt || Date.now()).toLocaleTimeString()}
-            </span>
+            <div className={styles.metaItem}>
+              <ShieldCheck size={14} className="text-emerald" />
+              <span>Deterministic algorithm v{matchData.matchingMetadata?.algorithmVersion || '1.0'}</span>
+            </div>
+            {matchData.matchingMetadata?.matchedAt && (
+              <div className={styles.metaItem}>
+                <Clock size={14} />
+                <span>Calculated on {new Date(matchData.matchingMetadata.matchedAt).toLocaleString()}</span>
+              </div>
+            )}
           </div>
         </>
-      )}
-
-      {/* Initial state guide before match is run */}
-      {!matchData && !isMatching && !errorMessage && (
-        <div className={styles.stateContainer}>
-          <div className={`${styles.stateIcon} ${styles.stateIconIndigo}`}>
-            <ArrowRight size={28} />
-          </div>
-          <h2 className={styles.stateTitle}>Ready to Run Skill Comparison</h2>
-          <p className={styles.stateMessage}>
-            Select a candidate resume and target job description above, then click <strong>Run Skill Matching</strong> to
-            evaluate technical skills, detect skill gaps, and view evidenced matches.
-          </p>
-        </div>
       )}
     </div>
   )

@@ -35,7 +35,38 @@ export async function getSavedSkillMatching(resumeId, jobDescriptionId) {
   return response.data
 }
 
+/**
+ * Calculates match score (skills, experience, education, overall) between a resume and job description.
+ * Day 21 Match Score API.
+ *
+ * @param {Object} params
+ * @param {number|string} params.resumeId
+ * @param {number|string} params.jobDescriptionId
+ * @returns {Promise<{ success: boolean, message: string, data: Object }>}
+ */
+export async function calculateMatchScore({ resumeId, jobDescriptionId }) {
+  const response = await api.post('/matching/score', {
+    resumeId: Number(resumeId),
+    jobDescriptionId: Number(jobDescriptionId),
+  })
+  return response.data
+}
+
+/**
+ * Retrieves previously saved match score for a resume and job description.
+ *
+ * @param {number|string} resumeId
+ * @param {number|string} jobDescriptionId
+ * @returns {Promise<{ success: boolean, data: Object }>}
+ */
+export async function getSavedMatchScore(resumeId, jobDescriptionId) {
+  const response = await api.get(`/matching/score/${resumeId}/${jobDescriptionId}`)
+  return response.data
+}
+
 export default {
   runSkillMatching,
   getSavedSkillMatching,
+  calculateMatchScore,
+  getSavedMatchScore,
 }
