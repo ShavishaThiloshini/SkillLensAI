@@ -2403,6 +2403,10 @@ Requirements:
   const { runDay21MatchScoreTests } = require("./day21MatchScoreTests");
   await runDay21MatchScoreTests(testAsync);
 
+  // ---- Day 23: Comprehensive AI Analysis Testing ----
+  const { runDay23AiAnalysisTests } = require("./day23AiAnalysisTests");
+  await runDay23AiAnalysisTests(testAsync);
+
   // Cleanup temp files
   try {
     fs.rmSync(testDir, { recursive: true, force: true });

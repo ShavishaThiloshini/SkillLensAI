@@ -149,8 +149,12 @@ async function calculateMatchScore(req, res) {
     });
   }
 
+  const forceFallback = req.body?.forceFallback === true;
+
   try {
-    const result = await MatchScoreService.calculateMatchScore(numResumeId, numJobId, userId);
+    const result = await MatchScoreService.calculateMatchScore(numResumeId, numJobId, userId, {
+      forceFallback,
+    });
 
     return res.status(200).json({
       success: true,

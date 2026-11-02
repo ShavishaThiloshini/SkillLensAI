@@ -15,6 +15,7 @@ const db = require("../config/db");
 const SkillMatchingService = require("./skillMatchingService");
 const ResumeService = require("./resumeService");
 const JobRequirementExtractionService = require("./jobRequirementExtractionService");
+const AiAnalysisService = require("./aiAnalysisService");
 
 const ALGORITHM_VERSION = "1.0";
 
@@ -345,7 +346,7 @@ class MatchScoreService {
     const maxYears = jobExp.maximumYears !== null && jobExp.maximumYears !== undefined
       ? Number(jobExp.maximumYears)
       : null;
-    const reqLevel = jobExp.level || null;
+    const reqLevel = jobExp.level || jobExp.seniorityLevel || null;
     const details = jobExp.details || [];
 
     // Check if job specifies any experience requirement
@@ -729,9 +730,10 @@ class MatchScoreService {
    * @param {number} resumeId
    * @param {number} jobId
    * @param {number} userId
+   * @param {Object} [options]
    * @returns {Promise<Object>}
    */
-  static async calculateMatchScore(resumeId, jobId, userId) {
+  static async calculateMatchScore(resumeId, jobId, userId, options = {}) {
     if (!resumeId || !jobId || !userId) {
       const err = new Error("Resume ID, Job Description ID, and User ID are required.");
       err.status = 400;
@@ -805,6 +807,21 @@ class MatchScoreService {
     // 6. Calculate overall score with normalized weights
     const overallScore = this.calculateOverallScore(categoryScores);
 
+    // 7. Generate structured AI Analysis across 7 key sections
+    let aiAnalysis = null;
+    try {
+      aiAnalysis = await AiAnalysisService.generateAnalysis({
+        structuredResume,
+        jobRequirements,
+        matchingResults,
+        categoryScores,
+        overallScore,
+        options,
+      });
+    } catch (aiErr) {
+      console.warn(`[MatchScoreService] AI analysis warning: ${aiErr.message}`);
+    }
+
     const allWarnings = [
       ...(overallScore.warnings || []),
       ...(matchingResults.matchingMetadata?.warnings || []),
@@ -812,7 +829,7 @@ class MatchScoreService {
 
     const calculatedAt = new Date().toISOString();
 
-    // 7. Structure the response conforming to Day 21 specification
+    // 8. Structure the response conforming to Day 21/23 specification
     const responsePayload = {
       resumeId: parsedResumeId,
       jobDescriptionId: parsedJobId,
@@ -852,6 +869,7 @@ class MatchScoreService {
         includedCategories: overallScore.includedCategories,
         explanation: overallScore.explanation,
       },
+      aiAnalysis,
       metadata: {
         algorithmVersion: ALGORITHM_VERSION,
         calculatedAt,
@@ -860,7 +878,7 @@ class MatchScoreService {
       },
     };
 
-    // 8. Persist scores to MySQL `analyses` table atomically
+    // 9. Persist scores to MySQL `analyses` table atomically
     await this.persistScores({
       userId: parsedUserId,
       resumeId: parsedResumeId,
@@ -893,6 +911,7 @@ class MatchScoreService {
           experience: { score: payload.scores.experience.score, status: payload.scores.experience.status },
           education: { score: payload.scores.education.score, status: payload.scores.education.status },
         },
+        aiAnalysis: payload.aiAnalysis || null,
         warnings: payload.metadata.warnings,
       });
 
@@ -1043,6 +1062,7 @@ class MatchScoreService {
         calculatedAt: analysis.completed_at || analysis.created_at,
         warnings: summaryObj?.warnings || [],
       },
+      aiAnalysis: summaryObj?.aiAnalysis || null,
     };
   }
 }

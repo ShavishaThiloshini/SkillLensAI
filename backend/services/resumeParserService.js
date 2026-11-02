@@ -451,7 +451,7 @@ function parseEducation(educationText, warnings = []) {
   if (!educationText || !educationText.trim()) return [];
 
   const lines = educationText.split("\n").map((l) => l.trim()).filter(Boolean);
-  const degreeRegex = /(?:Bachelor|Master|Doctor|Ph\.?D|B\.?Sc|M\.?Sc|B\.?S|M\.?S|B\.?A|M\.?A|B\.?E|M\.?E|B\.?Tech|M\.?Tech|Associate|Diploma|High\s+School)/i;
+  const degreeRegex = /(?:\bBachelor\b|\bMaster\b|\bDoctor\b|\bPh\.?D\b|\bB\.?Sc\b|\bM\.?Sc\b|\bB\.?S\b|\bM\.?S\b|\bB\.?A\b|\bM\.?A\b|\bB\.?E\b|\bM\.?E\b|\bB\.?Tech\b|\bM\.?Tech\b|\bAssociate\b|\bDiploma\b|\bHigh\s+School\b)/i;
   const instRegex = /(?:University|College|Institute|School|Academy|Polytechnic|\bMIT\b|\bStanford\b|\bHarvard\b|\bOxford\b|\bCambridge\b|\bCaltech\b)/i;
   const dateRegex = /(?:19|20)\d{2}\s*(?:-|–|—|to)\s*(?:(?:19|20)\d{2}|Present|Current|Expected(?:\s+(?:19|20)\d{2})?)/i;
   const gpaRegex = /(?:GPA|CGPA|Grade|Result)[\s:]*([0-4]\.\d{1,2}(?:\s*\/\s*4(?:\.0)?)?|\b[A-Za-z0-9.+%]+\b)/i;
@@ -473,22 +473,25 @@ function parseEducation(educationText, warnings = []) {
         fieldOfStudy: null,
         startDate: null,
         endDate: null,
+        isCurrent: null,
         grade: null,
         description: null,
       };
       if (dateMatch) {
-        const { startDate, endDate } = normalizeDateRange(dateMatch[0]);
+        const { startDate, endDate, isCurrent: currentFlag } = normalizeDateRange(dateMatch[0]);
         current.startDate = startDate;
         current.endDate = endDate;
+        current.isCurrent = currentFlag;
         current.qualification = line.replace(dateRegex, "").trim();
       }
     } else if (current) {
       if ((isInst || !current.institution) && !dateMatch && !gpaMatch && line.length < 80) {
         current.institution = line;
       } else if (dateMatch && (!current.startDate || !current.endDate)) {
-        const { startDate, endDate } = normalizeDateRange(dateMatch[0]);
+        const { startDate, endDate, isCurrent: currentFlag } = normalizeDateRange(dateMatch[0]);
         current.startDate = startDate;
         current.endDate = endDate;
+        current.isCurrent = currentFlag;
       } else if (gpaMatch && !current.grade) {
         current.grade = gpaMatch[0].trim();
       } else {
@@ -501,6 +504,7 @@ function parseEducation(educationText, warnings = []) {
         fieldOfStudy: null,
         startDate: null,
         endDate: null,
+        isCurrent: null,
         grade: null,
         description: null,
       };
@@ -527,6 +531,7 @@ function parseEducation(educationText, warnings = []) {
       fieldOfStudy,
       startDate: e.startDate || null,
       endDate: e.endDate || null,
+      isCurrent: e.isCurrent ?? null,
       grade: e.grade || null,
       description: e.description || null,
     };
