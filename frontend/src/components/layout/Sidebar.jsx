@@ -26,6 +26,7 @@ const NAV_ITEMS = [
       { label: 'My Resumes',       icon: FileText,        to: '/resumes' },
       { label: 'Job Descriptions', icon: Briefcase,       to: '/jobs' },
       { label: 'Skill Matching',   icon: Sparkles,        to: '/matching' },
+      { label: 'Analysis Results', icon: BarChart3,        to: '/analysis-results' },
       { label: 'Analysis History', icon: BarChart3,       to: '/history' },
       { label: 'Learning Roadmap', icon: BookOpen,        to: '/roadmap' },
     ],
