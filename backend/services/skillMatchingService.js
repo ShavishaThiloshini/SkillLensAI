@@ -289,6 +289,8 @@ class SkillMatchingService {
       }
 
       // Check Category A: STRONG MATCH (Exact or verified alias match)
+      const skillCat = jobSkill.category || "OTHER";
+
       if (resumeMap.has(jobKey)) {
         const matches = resumeMap.get(jobKey);
         const evidenceArr = matches
@@ -298,6 +300,7 @@ class SkillMatchingService {
         results.push({
           jobSkill: jobDisplayName,
           normalizedSkill: jobKey,
+          skillCategory: skillCat,
           requirementType,
           category: "STRONG_MATCH",
           priority: jobSkill.priority || (requirementType === "REQUIRED" ? "HIGH" : "MEDIUM"),
@@ -343,6 +346,7 @@ class SkillMatchingService {
         results.push({
           jobSkill: jobDisplayName,
           normalizedSkill: jobKey,
+          skillCategory: skillCat,
           requirementType,
           category: "PARTIAL_MATCH",
           priority: jobSkill.priority || (requirementType === "REQUIRED" ? "HIGH" : "MEDIUM"),
@@ -365,6 +369,7 @@ class SkillMatchingService {
       results.push({
         jobSkill: jobDisplayName,
         normalizedSkill: jobKey,
+        skillCategory: skillCat,
         requirementType,
         category: "MISSING",
         priority: jobSkill.priority || (requirementType === "REQUIRED" ? "HIGH" : "MEDIUM"),
@@ -379,6 +384,18 @@ class SkillMatchingService {
       else unspecMissingCount++;
     }
 
+    const categoryBreakdown = {};
+    for (const r of results) {
+      const cat = r.skillCategory || "OTHER";
+      if (!categoryBreakdown[cat]) {
+        categoryBreakdown[cat] = { total: 0, strong: 0, partial: 0, missing: 0 };
+      }
+      categoryBreakdown[cat].total++;
+      if (r.category === "STRONG_MATCH") categoryBreakdown[cat].strong++;
+      else if (r.category === "PARTIAL_MATCH") categoryBreakdown[cat].partial++;
+      else categoryBreakdown[cat].missing++;
+    }
+
     const summary = {
       totalJobSkills: cleanJobSkills.length,
       strongMatches: strongCount,
@@ -387,6 +404,7 @@ class SkillMatchingService {
       requiredSkills: requiredSkillsCount,
       preferredSkills: preferredSkillsCount,
       unspecifiedSkills: unspecifiedSkillsCount,
+      categoryBreakdown,
       requiredMatches: {
         strong: reqStrongCount,
         partial: reqPartialCount,
@@ -729,6 +747,7 @@ class SkillMatchingService {
       return {
         jobSkill: r.skill_name,
         normalizedSkill: norm?.normalizedName || r.skill_name.toLowerCase(),
+        skillCategory: norm?.category || r.skill_category || "OTHER",
         requirementType: r.requirement_type,
         category: r.status,
         priority: r.priority || "MEDIUM",
@@ -746,11 +765,25 @@ class SkillMatchingService {
     let prefStrong = 0, prefPartial = 0, prefMissing = 0;
     let unspecStrong = 0, unspecPartial = 0, unspecMissing = 0;
     let reqTotal = 0, prefTotal = 0, unspecTotal = 0;
+    const categoryBreakdown = {};
 
     for (const r of results) {
-      if (r.category === "STRONG_MATCH") strongCount++;
-      else if (r.category === "PARTIAL_MATCH") partialCount++;
-      else missingCount++;
+      const cat = r.skillCategory || "OTHER";
+      if (!categoryBreakdown[cat]) {
+        categoryBreakdown[cat] = { total: 0, strong: 0, partial: 0, missing: 0 };
+      }
+      categoryBreakdown[cat].total++;
+
+      if (r.category === "STRONG_MATCH") {
+        strongCount++;
+        categoryBreakdown[cat].strong++;
+      } else if (r.category === "PARTIAL_MATCH") {
+        partialCount++;
+        categoryBreakdown[cat].partial++;
+      } else {
+        missingCount++;
+        categoryBreakdown[cat].missing++;
+      }
 
       if (r.requirementType === "REQUIRED") {
         reqTotal++;
@@ -790,6 +823,7 @@ class SkillMatchingService {
         requiredSkills: reqTotal,
         preferredSkills: prefTotal,
         unspecifiedSkills: unspecTotal,
+        categoryBreakdown,
         requiredMatches: { strong: reqStrong, partial: reqPartial, missing: reqMissing },
         preferredMatches: { strong: prefStrong, partial: prefPartial, missing: prefMissing },
         unspecifiedMatches: { strong: unspecStrong, partial: unspecPartial, missing: unspecMissing },
