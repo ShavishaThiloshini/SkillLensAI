@@ -167,6 +167,27 @@ async function initDb() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
   `;
 
+  const createRoadmapItemsTableQuery = `
+    CREATE TABLE IF NOT EXISTS roadmap_items (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      analysis_id INT NOT NULL,
+      skill_id INT NULL,
+      title VARCHAR(200) NOT NULL,
+      description LONGTEXT NOT NULL,
+      step_order INT NOT NULL,
+      difficulty ENUM('BEGINNER', 'INTERMEDIATE', 'ADVANCED') NULL,
+      status ENUM('NOT_STARTED', 'IN_PROGRESS', 'COMPLETED') NOT NULL DEFAULT 'NOT_STARTED',
+      estimated_duration VARCHAR(50) NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_roadmap_analysis_id (analysis_id),
+      INDEX idx_roadmap_status (status),
+      INDEX idx_roadmap_step_order (analysis_id, step_order),
+      CONSTRAINT fk_roadmap_analysis FOREIGN KEY (analysis_id) REFERENCES analyses(id) ON DELETE CASCADE,
+      CONSTRAINT fk_roadmap_skill FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `;
+
   try {
     await db.query(createUsersTableQuery);
     console.log("[DB] `users` table verified/created successfully.");
@@ -197,6 +218,9 @@ async function initDb() {
 
     await db.query(createSkillMatchesTableQuery);
     console.log("[DB] `skill_matches` table verified/created successfully.");
+
+    await db.query(createRoadmapItemsTableQuery);
+    console.log("[DB] `roadmap_items` table verified/created successfully.");
 
     return true;
   } catch (error) {

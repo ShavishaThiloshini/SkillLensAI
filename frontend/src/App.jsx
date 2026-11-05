@@ -8,6 +8,7 @@ import JobDescriptions from './pages/JobDescriptions'
 import JobAnalysis from './pages/JobAnalysis'
 import SkillMatching from './pages/SkillMatching'
 import AnalysisResults from './pages/AnalysisResults'
+import Roadmap from './pages/Roadmap'
 import Settings from './pages/Settings'
 import { ProtectedRoute, PublicOnlyRoute } from './components/common/ProtectedRoute'
 import { useAuth } from './context/useAuth'
@@ -173,7 +174,7 @@ function App() {
         element={
           <ProtectedRoute>
             <AppLayout>
-              <PlaceholderPage title="Learning Roadmap" />
+              <Roadmap />
             </AppLayout>
           </ProtectedRoute>
         }

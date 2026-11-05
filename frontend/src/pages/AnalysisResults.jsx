@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, Briefcase, CheckCircle2, CircleAlert, Clock3, FileText, GraduationCap, Lightbulb, RefreshCw, Sparkles, Target, TrendingUp, XCircle } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, BookOpen, Briefcase, CheckCircle2, CircleAlert, Clock3, FileText, GraduationCap, Lightbulb, RefreshCw, Sparkles, Target, TrendingUp, XCircle } from 'lucide-react'
 import Button from '../components/common/Button'
 import Spinner from '../components/common/Spinner'
 import { getResumes } from '../services/resumeService'
@@ -97,7 +97,12 @@ function AnalysisResults() {
   return <main className={styles.page}>
     <header className={styles.header}>
       <div><p className={styles.eyebrow}>Saved comparison</p><h1>Analysis Results</h1><p className={styles.subtitle}>{jobTitle} · {resumeName} · {formatDate(metadata.calculatedAt || metadata.matchedAt)}</p></div>
-      <Button variant="outline" size="sm" onClick={rerun} disabled={rerunning}>{rerunning ? <Spinner size="sm" /> : <RefreshCw size={15} />} Re-run analysis</Button>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <Button variant="primary" size="sm" onClick={() => navigate(`/roadmap?resumeId=${resumeId}&jobId=${jobId}`)}>
+          <BookOpen size={15} /> View Skill Gap Roadmap
+        </Button>
+        <Button variant="outline" size="sm" onClick={rerun} disabled={rerunning}>{rerunning ? <Spinner size="sm" /> : <RefreshCw size={15} />} Re-run analysis</Button>
+      </div>
     </header>
     {(warnings.length > 0 || stale) && <div className={styles.warning} role="status"><AlertTriangle size={18} /><span>{stale ? 'Some saved results were generated with different analysis versions. Re-run the analysis to refresh them.' : warnings.join(' ')}</span></div>}
 
@@ -112,7 +117,7 @@ function AnalysisResults() {
 
     <section aria-labelledby="ai-analysis"><div className={styles.sectionHeading}><div><p className={styles.eyebrow}>Day 22 output</p><h2 id="ai-analysis">Detailed analysis and recommendations</h2></div></div>{analysis ? <AiAnalysis analysis={analysis} /> : <div className={styles.unavailable}><Sparkles size={22}/><div><h3>AI analysis unavailable</h3><p>The saved analysis does not include an AI narrative. You can still review the verified score and skill evidence above, or re-run the analysis.</p></div></div>}</section>
 
-    <footer className={styles.actions}><Button variant="outline" size="sm" onClick={() => navigate('/dashboard')}><ArrowLeft size={15}/> Return to Dashboard</Button><Link to="/resumes" className={styles.textLink}><FileText size={15}/> View Resume</Link><Link to={`/jobs/${jobId}/analysis`} className={styles.textLink}><Briefcase size={15}/> View Job Description</Link></footer>
+    <footer className={styles.actions}><Button variant="outline" size="sm" onClick={() => navigate('/dashboard')}><ArrowLeft size={15}/> Return to Dashboard</Button><Link to={`/roadmap?resumeId=${resumeId}&jobId=${jobId}`} className={styles.textLink}><BookOpen size={15}/> View Skill Gap Roadmap</Link><Link to="/resumes" className={styles.textLink}><FileText size={15}/> View Resume</Link><Link to={`/jobs/${jobId}/analysis`} className={styles.textLink}><Briefcase size={15}/> View Job Description</Link></footer>
   </main>
 }
 

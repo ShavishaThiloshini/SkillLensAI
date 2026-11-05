@@ -2407,6 +2407,10 @@ Requirements:
   const { runDay23AiAnalysisTests } = require("./day23AiAnalysisTests");
   await runDay23AiAnalysisTests(testAsync);
 
+  // ---- Day 26: Skill Gap Roadmap Engine Tests ----
+  const { runDay26SkillRoadmapTests } = require("./day26SkillRoadmapTests");
+  await runDay26SkillRoadmapTests(testAsync);
+
   // Cleanup temp files
   try {
     fs.rmSync(testDir, { recursive: true, force: true });
