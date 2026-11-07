@@ -8,6 +8,7 @@ import JobDescriptions from './pages/JobDescriptions'
 import JobAnalysis from './pages/JobAnalysis'
 import SkillMatching from './pages/SkillMatching'
 import AnalysisResults from './pages/AnalysisResults'
+import AnalysisHistory from './pages/AnalysisHistory'
 import Roadmap from './pages/Roadmap'
 import Settings from './pages/Settings'
 import { ProtectedRoute, PublicOnlyRoute } from './components/common/ProtectedRoute'
@@ -164,7 +165,7 @@ function App() {
         element={
           <ProtectedRoute>
             <AppLayout>
-              <PlaceholderPage title="Analysis History" />
+              <AnalysisHistory />
             </AppLayout>
           </ProtectedRoute>
         }

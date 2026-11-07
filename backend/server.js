@@ -37,6 +37,7 @@ const jobRoutes = require("./routes/jobRoutes");
 const aiRoutes = require("./routes/aiRoutes");
 const matchingRoutes = require("./routes/matchingRoutes");
 const roadmapRoutes = require("./routes/roadmapRoutes");
+const analysisRoutes = require("./routes/analysisRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/resumes", resumeRoutes);
@@ -44,6 +45,7 @@ app.use("/api/job-descriptions", jobRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/matching", matchingRoutes);
 app.use("/api/roadmap", roadmapRoutes);
+app.use("/api/analyses", analysisRoutes);
 
 app.get("/api/health", async (req, res) => {
   try {

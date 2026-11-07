@@ -23,6 +23,7 @@ import {
   Square,
   ShieldCheck,
   TrendingUp,
+  History,
 } from 'lucide-react'
 import Button from '../components/common/Button'
 import Spinner from '../components/common/Spinner'
@@ -339,6 +340,14 @@ export default function Roadmap() {
         </div>
 
         <div className={styles.headerActions}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/history')}
+          >
+            <History size={15} /> History
+          </Button>
+
           {overview?.resumeId && overview?.jobId && (
             <Button
               variant="outline"

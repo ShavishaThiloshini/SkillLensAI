@@ -884,6 +884,7 @@ class MatchScoreService {
       resumeId: parsedResumeId,
       jobId: parsedJobId,
       payload: responsePayload,
+      createNew: options.createNew === true,
     });
 
     return responsePayload;
@@ -892,10 +893,11 @@ class MatchScoreService {
   /**
    * Persists the match scores in the `analyses` table in MySQL.
    * Idempotent: Updates existing record for (user_id, resume_id, job_id) or inserts new one.
+   * When createNew is true, creates a new distinct snapshot record.
    *
    * @param {Object} params
    */
-  static async persistScores({ userId, resumeId, jobId, payload }) {
+  static async persistScores({ userId, resumeId, jobId, payload, createNew = false }) {
     const connection = await db.getConnection();
     try {
       await connection.beginTransaction();
@@ -913,16 +915,25 @@ class MatchScoreService {
         },
         aiAnalysis: payload.aiAnalysis || null,
         warnings: payload.metadata.warnings,
+        snapshot: {
+          jobTitle: payload.jobTitle,
+          company: payload.company,
+          resumeFilename: payload.resumeFilename,
+        },
       });
 
-      const [existing] = await connection.query(
-        `SELECT id FROM analyses WHERE user_id = ? AND resume_id = ? AND job_id = ? LIMIT 1`,
-        [userId, resumeId, jobId]
-      );
+      let existing = null;
+      if (!createNew) {
+        const [rows] = await connection.query(
+          `SELECT id FROM analyses WHERE user_id = ? AND resume_id = ? AND job_id = ? LIMIT 1`,
+          [userId, resumeId, jobId]
+        );
+        existing = rows;
+      }
 
       const now = new Date();
 
-      if (existing && existing.length > 0) {
+      if (!createNew && existing && existing.length > 0) {
         await connection.query(
           `UPDATE analyses
            SET overall_score = ?, skill_score = ?, experience_score = ?, education_score = ?,

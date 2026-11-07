@@ -2411,6 +2411,10 @@ Requirements:
   const { runDay26SkillRoadmapTests } = require("./day26SkillRoadmapTests");
   await runDay26SkillRoadmapTests(testAsync);
 
+  // ---- Day 27: Analysis History & Snapshot Tests ----
+  const { runDay27AnalysisHistoryTests } = require("./day27AnalysisHistoryTests");
+  await runDay27AnalysisHistoryTests(testAsync);
+
   // Cleanup temp files
   try {
     fs.rmSync(testDir, { recursive: true, force: true });

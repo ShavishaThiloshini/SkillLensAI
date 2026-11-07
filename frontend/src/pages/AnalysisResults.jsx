@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, BookOpen, Briefcase, CheckCircle2, CircleAlert, Clock3, FileText, GraduationCap, Lightbulb, RefreshCw, Sparkles, Target, TrendingUp, XCircle } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, BookOpen, Briefcase, CheckCircle2, CircleAlert, Clock3, FileText, GraduationCap, History, Lightbulb, RefreshCw, Sparkles, Target, TrendingUp, XCircle } from 'lucide-react'
 import Button from '../components/common/Button'
 import Spinner from '../components/common/Spinner'
 import { getResumes } from '../services/resumeService'
 import { getJobDescriptions } from '../services/jobService'
 import { calculateMatchScore, getSavedMatchScore, getSavedSkillMatching, runSkillMatching } from '../services/matchingService'
+import { getHistoricalAnalysis } from '../services/analysisService'
 import styles from './AnalysisResults.module.css'
 
 const CATEGORY = {
@@ -28,6 +29,7 @@ function scoreLabel(score, status) {
 function AnalysisResults() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
+  const analysisId = params.get('analysisId')
   const resumeId = params.get('resumeId')
   const jobId = params.get('jobId')
   const [loading, setLoading] = useState(true)
@@ -43,6 +45,29 @@ function AnalysisResults() {
     try {
       const [resumesResponse, jobsResponse] = await Promise.all([getResumes(), getJobDescriptions()])
       setAvailable({ resumes: resumesResponse.resumes || [], jobs: jobsResponse.jobs || [] })
+
+      if (analysisId) {
+        const historyRes = await getHistoricalAnalysis(analysisId)
+        const d = historyRes.data
+        setScoreData({
+          overall: d.overall,
+          scores: d.scores,
+          aiAnalysis: d.aiAnalysis,
+          metadata: d.metadata,
+          jobTitle: d.jobTitle,
+          resumeFilename: d.resumeFilename,
+          resumeId: d.resumeId,
+          jobId: d.jobDescriptionId,
+        })
+        setMatchData({
+          results: d.results || [],
+          matchingMetadata: d.metadata,
+          jobTitle: d.jobTitle,
+          resumeFilename: d.resumeFilename,
+        })
+        return
+      }
+
       if (!resumeId || !jobId) return
       const [scoreResponse, matchResponse] = await Promise.all([
         getSavedMatchScore(resumeId, jobId).catch((err) => err.response?.status === 404 ? null : Promise.reject(err)),
@@ -55,17 +80,20 @@ function AnalysisResults() {
     } finally {
       setLoading(false)
     }
-  }, [jobId, resumeId])
+  }, [analysisId, jobId, resumeId])
 
   useEffect(() => { loadResults() }, [loadResults])
 
+  const targetResumeId = resumeId || scoreData?.resumeId
+  const targetJobId = jobId || scoreData?.jobId
+
   const rerun = async () => {
-    if (!resumeId || !jobId) return
+    if (!targetResumeId || !targetJobId) return
     setRerunning(true); setError('')
     try {
-      await runSkillMatching({ resumeId, jobDescriptionId: jobId })
-      const scoreResponse = await calculateMatchScore({ resumeId, jobDescriptionId: jobId })
-      const matchResponse = await getSavedSkillMatching(resumeId, jobId)
+      await runSkillMatching({ resumeId: targetResumeId, jobDescriptionId: targetJobId })
+      const scoreResponse = await calculateMatchScore({ resumeId: targetResumeId, jobDescriptionId: targetJobId })
+      const matchResponse = await getSavedSkillMatching(targetResumeId, targetJobId)
       setScoreData(scoreResponse.data)
       setMatchData(matchResponse.data)
     } catch (err) {
@@ -80,28 +108,39 @@ function AnalysisResults() {
 
   if (loading) return <div className={styles.state}><Spinner size="lg" /><p>Loading your saved analysis results…</p></div>
 
-  if (!resumeId || !jobId) return (
-    <EmptyState icon={Target} title="Choose a resume and job description" message="Analysis Results needs both a selected resume and target job description." action={() => navigate('/matching')} actionLabel="Go to Skill Matching" />
+  if (!analysisId && (!resumeId || !jobId)) return (
+    <EmptyState icon={Target} title="Choose an analysis or resume and job" message="Analysis Results needs an analysis record or selected resume and target job description." action={() => navigate('/history')} actionLabel="Go to Analysis History" secondary={() => navigate('/matching')} />
   )
-  if (error) return <EmptyState icon={CircleAlert} title="Results could not be loaded" message={error} action={loadResults} actionLabel="Try again" secondary={() => navigate('/matching')} />
+  if (error) return <EmptyState icon={CircleAlert} title="Results could not be loaded" message={error} action={loadResults} actionLabel="Try again" secondary={() => navigate('/history')} />
   if (!scoreData && !matchData) return (
-    <EmptyState icon={Sparkles} title="No saved analysis yet" message="Run an analysis for this resume and job description to view a consolidated result." action={rerun} actionLabel="Run analysis" secondary={() => navigate(`/matching?resumeId=${resumeId}&jobId=${jobId}`)} />
+    <EmptyState icon={Sparkles} title="No saved analysis yet" message="Run an analysis for this resume and job description to view a consolidated result." action={rerun} actionLabel="Run analysis" secondary={() => navigate(`/matching?resumeId=${targetResumeId || ''}&jobId=${targetJobId || ''}`)} />
   )
 
   const score = scoreData?.overall?.score
   const analysis = scoreData?.aiAnalysis
   const warnings = scoreData?.metadata?.warnings || matchData?.matchingMetadata?.warnings || []
-  const jobTitle = scoreData?.jobTitle || matchData?.jobTitle || available.jobs.find((job) => String(job.id) === String(jobId))?.title || 'Selected job'
-  const resumeName = scoreData?.resumeFilename || matchData?.resumeFilename || available.resumes.find((resume) => String(resume.id) === String(resumeId))?.original_filename || 'Selected resume'
+  const jobTitle = scoreData?.jobTitle || matchData?.jobTitle || available.jobs.find((job) => String(job.id) === String(targetJobId))?.title || 'Selected job'
+  const resumeName = scoreData?.resumeFilename || matchData?.resumeFilename || available.resumes.find((resume) => String(resume.id) === String(targetResumeId))?.original_filename || 'Selected resume'
 
   return <main className={styles.page}>
     <header className={styles.header}>
-      <div><p className={styles.eyebrow}>Saved comparison</p><h1>Analysis Results</h1><p className={styles.subtitle}>{jobTitle} · {resumeName} · {formatDate(metadata.calculatedAt || metadata.matchedAt)}</p></div>
+      <div>
+        <p className={styles.eyebrow}>{analysisId ? 'Historical snapshot' : 'Saved comparison'}</p>
+        <h1>Analysis Results</h1>
+        <p className={styles.subtitle}>{jobTitle} · {resumeName} · {formatDate(metadata.calculatedAt || metadata.matchedAt)}</p>
+      </div>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-        <Button variant="primary" size="sm" onClick={() => navigate(`/roadmap?resumeId=${resumeId}&jobId=${jobId}`)}>
-          <BookOpen size={15} /> View Skill Gap Roadmap
+        <Button variant="outline" size="sm" onClick={() => navigate('/history')}>
+          <History size={15} /> Back to History
         </Button>
-        <Button variant="outline" size="sm" onClick={rerun} disabled={rerunning}>{rerunning ? <Spinner size="sm" /> : <RefreshCw size={15} />} Re-run analysis</Button>
+        {targetResumeId && targetJobId && (
+          <Button variant="primary" size="sm" onClick={() => navigate(`/roadmap?analysisId=${analysisId || ''}&resumeId=${targetResumeId}&jobId=${targetJobId}`)}>
+            <BookOpen size={15} /> View Skill Gap Roadmap
+          </Button>
+        )}
+        <Button variant="outline" size="sm" onClick={rerun} disabled={rerunning || !targetResumeId || !targetJobId}>
+          {rerunning ? <Spinner size="sm" /> : <RefreshCw size={15} />} Re-run analysis
+        </Button>
       </div>
     </header>
     {(warnings.length > 0 || stale) && <div className={styles.warning} role="status"><AlertTriangle size={18} /><span>{stale ? 'Some saved results were generated with different analysis versions. Re-run the analysis to refresh them.' : warnings.join(' ')}</span></div>}
@@ -117,7 +156,7 @@ function AnalysisResults() {
 
     <section aria-labelledby="ai-analysis"><div className={styles.sectionHeading}><div><p className={styles.eyebrow}>Day 22 output</p><h2 id="ai-analysis">Detailed analysis and recommendations</h2></div></div>{analysis ? <AiAnalysis analysis={analysis} /> : <div className={styles.unavailable}><Sparkles size={22}/><div><h3>AI analysis unavailable</h3><p>The saved analysis does not include an AI narrative. You can still review the verified score and skill evidence above, or re-run the analysis.</p></div></div>}</section>
 
-    <footer className={styles.actions}><Button variant="outline" size="sm" onClick={() => navigate('/dashboard')}><ArrowLeft size={15}/> Return to Dashboard</Button><Link to={`/roadmap?resumeId=${resumeId}&jobId=${jobId}`} className={styles.textLink}><BookOpen size={15}/> View Skill Gap Roadmap</Link><Link to="/resumes" className={styles.textLink}><FileText size={15}/> View Resume</Link><Link to={`/jobs/${jobId}/analysis`} className={styles.textLink}><Briefcase size={15}/> View Job Description</Link></footer>
+    <footer className={styles.actions}><Button variant="outline" size="sm" onClick={() => navigate('/history')}><History size={15}/> Analysis History</Button><Button variant="outline" size="sm" onClick={() => navigate('/dashboard')}><ArrowLeft size={15}/> Return to Dashboard</Button>{targetResumeId && targetJobId && <Link to={`/roadmap?analysisId=${analysisId || ''}&resumeId=${targetResumeId}&jobId=${targetJobId}`} className={styles.textLink}><BookOpen size={15}/> View Skill Gap Roadmap</Link>}<Link to="/resumes" className={styles.textLink}><FileText size={15}/> View Resume</Link><Link to={targetJobId ? `/jobs/${targetJobId}/analysis` : '/jobs'} className={styles.textLink}><Briefcase size={15}/> View Job Description</Link></footer>
   </main>
 }
 
