@@ -134,9 +134,14 @@ function AnalysisResults() {
           <History size={15} /> Back to History
         </Button>
         {targetResumeId && targetJobId && (
-          <Button variant="primary" size="sm" onClick={() => navigate(`/roadmap?analysisId=${analysisId || ''}&resumeId=${targetResumeId}&jobId=${targetJobId}`)}>
-            <BookOpen size={15} /> View Skill Gap Roadmap
-          </Button>
+          <>
+            <Button variant="primary" size="sm" onClick={() => navigate(`/roadmap?analysisId=${analysisId || ''}&resumeId=${targetResumeId}&jobId=${targetJobId}`)}>
+              <BookOpen size={15} /> View Skill Gap Roadmap
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate(`/recommendations?resumeId=${targetResumeId}&jobId=${targetJobId}`)}>
+              <GraduationCap size={15} /> Learning Recommendations
+            </Button>
+          </>
         )}
         <Button variant="outline" size="sm" onClick={rerun} disabled={rerunning || !targetResumeId || !targetJobId}>
           {rerunning ? <Spinner size="sm" /> : <RefreshCw size={15} />} Re-run analysis

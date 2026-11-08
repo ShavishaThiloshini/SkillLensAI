@@ -24,6 +24,7 @@ import {
   ShieldCheck,
   TrendingUp,
   History,
+  GraduationCap,
 } from 'lucide-react'
 import Button from '../components/common/Button'
 import Spinner from '../components/common/Spinner'
@@ -348,6 +349,16 @@ export default function Roadmap() {
             <History size={15} /> History
           </Button>
 
+          {selectedResumeId && selectedJobId && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/recommendations?resumeId=${selectedResumeId}&jobId=${selectedJobId}`)}
+            >
+              <GraduationCap size={15} /> Recommendations
+            </Button>
+          )}
+
           {overview?.resumeId && overview?.jobId && (
             <Button
               variant="outline"
@@ -534,6 +545,13 @@ export default function Roadmap() {
               <span className={styles.badgePill}>
                 {(missingSkills?.totalMissingCount || 0) + (missingSkills?.partial?.length || 0)}
               </span>
+            </button>
+            <button
+              className={styles.tabBtn}
+              onClick={() => navigate(`/recommendations?resumeId=${selectedResumeId}&jobId=${selectedJobId}`)}
+            >
+              <GraduationCap size={16} /> Learning Recommendations
+              <span className={styles.badgePill}>{roadmapData.roadmap?.length || 0}</span>
             </button>
           </nav>
 

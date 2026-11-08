@@ -10,6 +10,7 @@ import SkillMatching from './pages/SkillMatching'
 import AnalysisResults from './pages/AnalysisResults'
 import AnalysisHistory from './pages/AnalysisHistory'
 import Roadmap from './pages/Roadmap'
+import Recommendations from './pages/Recommendations'
 import Settings from './pages/Settings'
 import { ProtectedRoute, PublicOnlyRoute } from './components/common/ProtectedRoute'
 import { useAuth } from './context/useAuth'
@@ -176,6 +177,16 @@ function App() {
           <ProtectedRoute>
             <AppLayout>
               <Roadmap />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/recommendations"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <Recommendations />
             </AppLayout>
           </ProtectedRoute>
         }

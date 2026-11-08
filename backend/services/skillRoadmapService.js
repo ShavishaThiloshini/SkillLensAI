@@ -1288,17 +1288,30 @@ class SkillRoadmapService {
           const savedStatus = stepStatusMap.get(step.stepIndex);
           return {
             ...step,
+            explanation: step.explanation || step.description,
+            learningObjective: step.learningObjective || step.description,
+            practicalActivity: step.practicalActivity || (learningPath.practicalActivities && learningPath.practicalActivities[step.stepIndex - 1]) || "Hands-on practice task.",
             status: savedStatus || step.status || "NOT_STARTED",
           };
         });
+      } else if (Array.isArray(learningPath.learningSteps)) {
+        learningPath.learningSteps = learningPath.learningSteps.map((step) => ({
+          ...step,
+          explanation: step.explanation || step.description,
+          learningObjective: step.learningObjective || step.description,
+          practicalActivity: step.practicalActivity || (learningPath.practicalActivities && learningPath.practicalActivities[step.stepIndex - 1]) || "Hands-on practice task.",
+          status: step.status || "NOT_STARTED",
+        }));
       }
 
       // Preserve overall status
       const initialStatus = existing?.status || "NOT_STARTED";
+      const priorityStr = item.priorityLevel === 1 ? "HIGH" : item.priorityLevel === 3 ? "LOW" : "MEDIUM";
 
       // Build consolidated description object for database and frontend
       const descriptionPayload = {
         priorityLevel: item.priorityLevel,
+        priorityLevelStr: priorityStr,
         priorityLabel: item.priorityLabel,
         priorityReason: item.priorityReason,
         requirementType: item.requirementType,
@@ -1308,10 +1321,13 @@ class SkillRoadmapService {
         prerequisites: item.dependsOnMissing ? [item.dependsOnMissing] : [],
         isFoundational: item.isFoundational,
         learningObjective: learningPath.learningObjective,
+        recommendedTopics: learningPath.recommendedTopics || [],
         learningSteps: learningPath.learningSteps,
         practicalActivities: learningPath.practicalActivities,
+        practicalExercises: learningPath.practicalActivities || [],
         miniProject: learningPath.miniProject,
         completionCriteria: learningPath.completionCriteria,
+        expectedOutcomes: learningPath.completionCriteria || [],
       };
 
       roadmapItems.push({
@@ -1323,6 +1339,7 @@ class SkillRoadmapService {
         estimatedDuration: learningPath.estimatedDuration || "2 weeks",
         status: initialStatus,
         priorityLevel: item.priorityLevel,
+        priorityLevelStr: priorityStr,
         priorityLabel: item.priorityLabel,
         priorityReason: item.priorityReason,
         requirementType: item.requirementType,
@@ -1331,10 +1348,13 @@ class SkillRoadmapService {
         relatedResumeSkill: item.matchedSkill || null,
         prerequisites: item.dependsOnMissing ? [item.dependsOnMissing] : [],
         learningObjective: learningPath.learningObjective,
+        recommendedTopics: learningPath.recommendedTopics || [],
         learningSteps: learningPath.learningSteps,
         practicalActivities: learningPath.practicalActivities,
+        practicalExercises: learningPath.practicalActivities || [],
         miniProject: learningPath.miniProject,
         completionCriteria: learningPath.completionCriteria,
+        expectedOutcomes: learningPath.completionCriteria || [],
         descriptionPayload,
       });
     }

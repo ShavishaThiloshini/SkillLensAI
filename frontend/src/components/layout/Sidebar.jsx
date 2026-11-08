@@ -7,6 +7,7 @@ import {
   BarChart3,
   History,
   BookOpen,
+  GraduationCap,
   User,
   Settings,
   X,
@@ -30,6 +31,7 @@ const NAV_ITEMS = [
       { label: 'Analysis Results', icon: BarChart3,        to: '/analysis-results' },
       { label: 'Analysis History', icon: History,         to: '/history' },
       { label: 'Learning Roadmap', icon: BookOpen,        to: '/roadmap' },
+      { label: 'Recommendations',  icon: GraduationCap,   to: '/recommendations' },
     ],
   },
   {
