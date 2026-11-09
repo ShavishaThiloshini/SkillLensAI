@@ -8,6 +8,7 @@ import {
   History,
   BookOpen,
   GraduationCap,
+  FileEdit,
   User,
   Settings,
   X,
@@ -32,6 +33,7 @@ const NAV_ITEMS = [
       { label: 'Analysis History', icon: History,         to: '/history' },
       { label: 'Learning Roadmap', icon: BookOpen,        to: '/roadmap' },
       { label: 'Recommendations',  icon: GraduationCap,   to: '/recommendations' },
+      { label: 'Resume Improvements', icon: FileEdit,     to: '/improvements' },
     ],
   },
   {

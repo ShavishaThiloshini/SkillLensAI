@@ -223,6 +223,24 @@ async function initDb() {
     await db.query(createRoadmapItemsTableQuery);
     console.log("[DB] `roadmap_items` table verified/created successfully.");
 
+    const createResumeSuggestionsTableQuery = `
+      CREATE TABLE IF NOT EXISTS resume_suggestions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        analysis_id INT NOT NULL,
+        section VARCHAR(100) NOT NULL,
+        original_text TEXT NULL,
+        suggestion LONGTEXT NOT NULL,
+        reason TEXT NULL,
+        priority ENUM('HIGH', 'MEDIUM', 'LOW') NOT NULL DEFAULT 'MEDIUM',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_suggestions_analysis_id (analysis_id),
+        INDEX idx_suggestions_section (section),
+        CONSTRAINT fk_suggestions_analysis FOREIGN KEY (analysis_id) REFERENCES analyses(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `;
+    await db.query(createResumeSuggestionsTableQuery);
+    console.log("[DB] `resume_suggestions` table verified/created successfully.");
+
     return true;
   } catch (error) {
     console.error("[DB] Failed to initialize database tables:", error.message);

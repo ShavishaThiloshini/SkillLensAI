@@ -2419,6 +2419,10 @@ Requirements:
   const { runDay28LearningRecommendationTests } = require("./day28LearningRecommendationTests");
   await runDay28LearningRecommendationTests(testAsync);
 
+  // ---- Day 29: Resume Improvement Suggestions Tests ----
+  const { runDay29ResumeImprovementTests } = require("./day29ResumeImprovementTests");
+  await runDay29ResumeImprovementTests(testAsync);
+
   // Cleanup temp files
   try {
     fs.rmSync(testDir, { recursive: true, force: true });

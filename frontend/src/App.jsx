@@ -11,6 +11,7 @@ import AnalysisResults from './pages/AnalysisResults'
 import AnalysisHistory from './pages/AnalysisHistory'
 import Roadmap from './pages/Roadmap'
 import Recommendations from './pages/Recommendations'
+import ResumeImprovements from './pages/ResumeImprovements'
 import Settings from './pages/Settings'
 import { ProtectedRoute, PublicOnlyRoute } from './components/common/ProtectedRoute'
 import { useAuth } from './context/useAuth'
@@ -187,6 +188,16 @@ function App() {
           <ProtectedRoute>
             <AppLayout>
               <Recommendations />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/improvements"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <ResumeImprovements />
             </AppLayout>
           </ProtectedRoute>
         }
