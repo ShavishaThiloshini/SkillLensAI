@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, BookOpen, Briefcase, CheckCircle2, CircleAlert, Clock3, FileEdit, FileText, GraduationCap, History, Lightbulb, RefreshCw, Sparkles, Target, TrendingUp, XCircle } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, BookOpen, Briefcase, CheckCircle2, CircleAlert, Clock3, Compass, FileEdit, FileText, GraduationCap, History, Lightbulb, RefreshCw, Sparkles, Target, TrendingUp, XCircle } from 'lucide-react'
 import Button from '../components/common/Button'
 import Spinner from '../components/common/Spinner'
 import { getResumes } from '../services/resumeService'
@@ -144,6 +144,9 @@ function AnalysisResults() {
             <Button variant="outline" size="sm" onClick={() => navigate(`/improvements?analysisId=${analysisId || ''}&resumeId=${targetResumeId}&jobId=${targetJobId}`)}>
               <FileEdit size={15} /> Improve Resume
             </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate(`/career-insights?analysisId=${analysisId || ''}&resumeId=${targetResumeId}&jobId=${targetJobId}`)}>
+              <Compass size={15} /> Career Insights
+            </Button>
           </>
         )}
         <Button variant="outline" size="sm" onClick={rerun} disabled={rerunning || !targetResumeId || !targetJobId}>
@@ -164,7 +167,7 @@ function AnalysisResults() {
 
     <section aria-labelledby="ai-analysis"><div className={styles.sectionHeading}><div><p className={styles.eyebrow}>Day 22 output</p><h2 id="ai-analysis">Detailed analysis and recommendations</h2></div></div>{analysis ? <AiAnalysis analysis={analysis} /> : <div className={styles.unavailable}><Sparkles size={22}/><div><h3>AI analysis unavailable</h3><p>The saved analysis does not include an AI narrative. You can still review the verified score and skill evidence above, or re-run the analysis.</p></div></div>}</section>
 
-    <footer className={styles.actions}><Button variant="outline" size="sm" onClick={() => navigate('/history')}><History size={15}/> Analysis History</Button><Button variant="outline" size="sm" onClick={() => navigate('/dashboard')}><ArrowLeft size={15}/> Return to Dashboard</Button>{targetResumeId && targetJobId && <Link to={`/roadmap?analysisId=${analysisId || ''}&resumeId=${targetResumeId}&jobId=${targetJobId}`} className={styles.textLink}><BookOpen size={15}/> View Skill Gap Roadmap</Link>}{targetResumeId && targetJobId && <Link to={`/improvements?analysisId=${analysisId || ''}&resumeId=${targetResumeId}&jobId=${targetJobId}`} className={styles.textLink}><FileEdit size={15}/> Resume Improvements</Link>}<Link to="/resumes" className={styles.textLink}><FileText size={15}/> View Resume</Link><Link to={targetJobId ? `/jobs/${targetJobId}/analysis` : '/jobs'} className={styles.textLink}><Briefcase size={15}/> View Job Description</Link></footer>
+    <footer className={styles.actions}><Button variant="outline" size="sm" onClick={() => navigate('/history')}><History size={15}/> Analysis History</Button><Button variant="outline" size="sm" onClick={() => navigate('/dashboard')}><ArrowLeft size={15}/> Return to Dashboard</Button>{targetResumeId && targetJobId && <Link to={`/roadmap?analysisId=${analysisId || ''}&resumeId=${targetResumeId}&jobId=${targetJobId}`} className={styles.textLink}><BookOpen size={15}/> View Skill Gap Roadmap</Link>}{targetResumeId && targetJobId && <Link to={`/improvements?analysisId=${analysisId || ''}&resumeId=${targetResumeId}&jobId=${targetJobId}`} className={styles.textLink}><FileEdit size={15}/> Resume Improvements</Link>}{targetResumeId && targetJobId && <Link to={`/career-insights?analysisId=${analysisId || ''}&resumeId=${targetResumeId}&jobId=${targetJobId}`} className={styles.textLink}><Compass size={15}/> Career Insights</Link>}<Link to="/resumes" className={styles.textLink}><FileText size={15}/> View Resume</Link><Link to={targetJobId ? `/jobs/${targetJobId}/analysis` : '/jobs'} className={styles.textLink}><Briefcase size={15}/> View Job Description</Link></footer>
   </main>
 }
 

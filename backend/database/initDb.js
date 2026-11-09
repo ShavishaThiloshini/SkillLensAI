@@ -241,6 +241,25 @@ async function initDb() {
     await db.query(createResumeSuggestionsTableQuery);
     console.log("[DB] `resume_suggestions` table verified/created successfully.");
 
+    const createCareerInsightsTableQuery = `
+      CREATE TABLE IF NOT EXISTS career_insights (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        analysis_id INT NOT NULL,
+        readiness_score DECIMAL(5,2) NULL,
+        readiness_level VARCHAR(50) NOT NULL DEFAULT 'INSUFFICIENT_DATA',
+        strengths_count INT DEFAULT 0,
+        weaknesses_count INT DEFAULT 0,
+        priority_skills_count INT DEFAULT 0,
+        summary LONGTEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_ci_analysis_id (analysis_id),
+        CONSTRAINT fk_ci_analysis FOREIGN KEY (analysis_id) REFERENCES analyses(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `;
+    await db.query(createCareerInsightsTableQuery);
+    console.log("[DB] `career_insights` table verified/created successfully.");
+
     return true;
   } catch (error) {
     console.error("[DB] Failed to initialize database tables:", error.message);

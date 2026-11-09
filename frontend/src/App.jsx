@@ -12,6 +12,7 @@ import AnalysisHistory from './pages/AnalysisHistory'
 import Roadmap from './pages/Roadmap'
 import Recommendations from './pages/Recommendations'
 import ResumeImprovements from './pages/ResumeImprovements'
+import CareerInsights from './pages/CareerInsights'
 import Settings from './pages/Settings'
 import { ProtectedRoute, PublicOnlyRoute } from './components/common/ProtectedRoute'
 import { useAuth } from './context/useAuth'
@@ -198,6 +199,26 @@ function App() {
           <ProtectedRoute>
             <AppLayout>
               <ResumeImprovements />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/career-insights"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <CareerInsights />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/insights"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <CareerInsights />
             </AppLayout>
           </ProtectedRoute>
         }

@@ -40,6 +40,7 @@ const roadmapRoutes = require("./routes/roadmapRoutes");
 const analysisRoutes = require("./routes/analysisRoutes");
 const recommendationRoutes = require("./routes/recommendationRoutes");
 const resumeImprovementRoutes = require("./routes/resumeImprovementRoutes");
+const careerInsightsRoutes = require("./routes/careerInsightsRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/resumes", resumeRoutes);
@@ -51,6 +52,8 @@ app.use("/api/analyses", analysisRoutes);
 app.use("/api/recommendations", recommendationRoutes);
 app.use("/api/resume-improvements", resumeImprovementRoutes);
 app.use("/api/improvements", resumeImprovementRoutes);
+app.use("/api/career-insights", careerInsightsRoutes);
+app.use("/api/insights", careerInsightsRoutes);
 
 app.get("/api/health", async (req, res) => {
   try {

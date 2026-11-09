@@ -2423,6 +2423,10 @@ Requirements:
   const { runDay29ResumeImprovementTests } = require("./day29ResumeImprovementTests");
   await runDay29ResumeImprovementTests(testAsync);
 
+  // ---- Day 30: Career Insights & Readiness Tests ----
+  const { runDay30CareerInsightsTests } = require("./day30CareerInsightsTests");
+  await runDay30CareerInsightsTests(testAsync);
+
   // Cleanup temp files
   try {
     fs.rmSync(testDir, { recursive: true, force: true });

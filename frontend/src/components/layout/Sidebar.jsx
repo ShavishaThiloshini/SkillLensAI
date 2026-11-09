@@ -9,6 +9,7 @@ import {
   BookOpen,
   GraduationCap,
   FileEdit,
+  Compass,
   User,
   Settings,
   X,
@@ -34,6 +35,7 @@ const NAV_ITEMS = [
       { label: 'Learning Roadmap', icon: BookOpen,        to: '/roadmap' },
       { label: 'Recommendations',  icon: GraduationCap,   to: '/recommendations' },
       { label: 'Resume Improvements', icon: FileEdit,     to: '/improvements' },
+      { label: 'Career Insights',    icon: Compass,      to: '/career-insights' },
     ],
   },
   {
