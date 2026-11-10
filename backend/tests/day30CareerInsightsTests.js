@@ -65,10 +65,10 @@ async function runDay30CareerInsightsTests(testAsync) {
       db.query = handler;
       db.getConnection = async () => ({
         query: handler,
-        beginTransaction: async () => {},
-        commit: async () => {},
-        rollback: async () => {},
-        release: () => {},
+        beginTransaction: async () => { },
+        commit: async () => { },
+        rollback: async () => { },
+        release: () => { },
       });
       try {
         await fn();

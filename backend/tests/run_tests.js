@@ -2427,6 +2427,10 @@ Requirements:
   const { runDay30CareerInsightsTests } = require("./day30CareerInsightsTests");
   await runDay30CareerInsightsTests(testAsync);
 
+  // ---- Day 31: Report Generation (PDF & Preview) Tests ----
+  const { runDay31ReportGenerationTests } = require("./day31ReportGenerationTests");
+  await runDay31ReportGenerationTests(testAsync);
+
   // Cleanup temp files
   try {
     fs.rmSync(testDir, { recursive: true, force: true });

@@ -7,6 +7,7 @@ import {
   Briefcase,
   FileText,
   Clock,
+  FileDown,
   Award,
   BookOpen,
   Trash2,
@@ -497,6 +498,15 @@ export default function AnalysisHistory() {
                       <BookOpen size={14} /> Roadmap
                     </Button>
                   )}
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/reports/${item.id}`)}
+                    title="View and download PDF report"
+                  >
+                    <FileDown size={14} /> Report
+                  </Button>
 
                   <Button
                     variant="primary"

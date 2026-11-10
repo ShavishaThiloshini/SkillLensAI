@@ -10,6 +10,7 @@ import {
   GraduationCap,
   FileEdit,
   Compass,
+  FileDown,
   User,
   Settings,
   X,
@@ -36,6 +37,7 @@ const NAV_ITEMS = [
       { label: 'Recommendations',  icon: GraduationCap,   to: '/recommendations' },
       { label: 'Resume Improvements', icon: FileEdit,     to: '/improvements' },
       { label: 'Career Insights',    icon: Compass,      to: '/career-insights' },
+      { label: 'Skill Gap Report',   icon: FileDown,     to: '/reports' },
     ],
   },
   {
