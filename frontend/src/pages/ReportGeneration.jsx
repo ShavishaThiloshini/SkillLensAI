@@ -14,10 +14,13 @@ import {
   BookOpen,
   ArrowLeft,
   Briefcase,
-  Layers,
   Sparkles,
 } from 'lucide-react'
 import Button from '../components/common/Button'
+import PageHeader from '../components/common/PageHeader'
+import EmptyState from '../components/common/EmptyState'
+import ErrorState from '../components/common/ErrorState'
+import SkeletonLoader from '../components/common/SkeletonLoader'
 import Spinner from '../components/common/Spinner'
 import { getAnalysisHistory } from '../services/analysisService'
 import { getReportPreview, downloadReportPdf } from '../services/reportService'
@@ -110,42 +113,40 @@ export default function ReportGeneration() {
   return (
     <div className={styles.page}>
       {/* ── Top Header ── */}
-      <header className={styles.header}>
-        <div>
-          <p className={styles.eyebrow}>Exportable PDF Documentation</p>
-          <h1 className={styles.title}>AI Resume Skill Gap Report</h1>
-          <p className={styles.subtitle}>
-            Generate, preview, and download a publication-ready PDF summary of your resume analysis, matching evidence, skill gaps, personalized recommendations, and learning roadmap.
-          </p>
-        </div>
-        <div className={styles.headerActions}>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate('/history')}
-          >
-            <History size={15} /> Analysis History
-          </Button>
-          {selectedAnalysisId && (
+      <PageHeader
+        eyebrow="Exportable PDF Documentation"
+        title="AI Resume Skill Gap Report"
+        subtitle="Generate, preview, and download a publication-ready PDF summary of your resume analysis, matching evidence, skill gaps, personalized recommendations, and learning roadmap."
+        actions={
+          <>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate(`/analysis-results?analysisId=${selectedAnalysisId}`)}
+              onClick={() => navigate('/history')}
             >
-              <TrendingUp size={15} /> Results View
+              <History size={15} /> Analysis History
             </Button>
-          )}
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleDownload}
-            disabled={downloading || !reportData || loading}
-          >
-            {downloading ? <Spinner size="sm" /> : <FileDown size={15} />}
-            {downloading ? 'Generating PDF…' : 'Download PDF Report'}
-          </Button>
-        </div>
-      </header>
+            {selectedAnalysisId && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/analysis-results?analysisId=${selectedAnalysisId}`)}
+              >
+                <TrendingUp size={15} /> Results View
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleDownload}
+              disabled={downloading || !reportData || loading}
+            >
+              {downloading ? <Spinner size="sm" /> : <FileDown size={15} />}
+              {downloading ? 'Generating PDF…' : 'Download PDF Report'}
+            </Button>
+          </>
+        }
+      />
 
       {/* ── Analysis Selector Bar ── */}
       <section className={styles.selectorBar} aria-label="Select Analysis for Report">
@@ -179,34 +180,31 @@ export default function ReportGeneration() {
 
       {/* ── Loading / Error / Empty States ── */}
       {loading && (
-        <div className={styles.emptyState}>
-          <Spinner size="lg" />
-          <p>Compiling structured report data and rendering PDF preview…</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', padding: 'var(--space-6) 0' }}>
+          <SkeletonLoader variant="paragraph" count={3} />
+          <SkeletonLoader variant="card" height="300px" />
         </div>
       )}
 
       {error && !loading && (
-        <div className={styles.emptyState}>
-          <AlertTriangle size={32} color="var(--color-amber)" />
-          <h2 className={styles.emptyTitle}>Unable to Load Report</h2>
-          <p className={styles.emptyDesc}>{error}</p>
-          <Button variant="outline" size="sm" onClick={fetchPreview}>
-            <RefreshCw size={14} /> Retry
-          </Button>
-        </div>
+        <ErrorState
+          title="Unable to Load Report"
+          message={error}
+          onRetry={fetchPreview}
+        />
       )}
 
       {!loading && !error && !reportData && (
-        <div className={styles.emptyState}>
-          <FileText size={36} color="var(--color-indigo)" />
-          <h2 className={styles.emptyTitle}>No Analysis Selected</h2>
-          <p className={styles.emptyDesc}>
-            Please select an existing completed analysis above to preview and download your skill gap report.
-          </p>
-          <Button variant="primary" size="sm" onClick={() => navigate('/history')}>
-            Go to Analysis History
-          </Button>
-        </div>
+        <EmptyState
+          icon={FileText}
+          title="No Analysis Selected"
+          description="Please select an existing completed analysis above to preview and download your skill gap report."
+          action={
+            <Button variant="primary" size="sm" onClick={() => navigate('/history')}>
+              Go to Analysis History
+            </Button>
+          }
+        />
       )}
 
       {/* ── Main Preview Content ── */}

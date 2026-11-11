@@ -24,6 +24,9 @@ import {
   ExternalLink,
 } from 'lucide-react'
 import Button from '../components/common/Button'
+import PageHeader from '../components/common/PageHeader'
+import EmptyState from '../components/common/EmptyState'
+import SkeletonLoader from '../components/common/SkeletonLoader'
 import Card, { CardBody, CardHeader } from '../components/common/Card'
 import Modal from '../components/common/Modal'
 import Spinner from '../components/common/Spinner'
@@ -406,24 +409,11 @@ export default function JobDescriptions() {
   return (
     <div className={styles.container}>
       {/* Page Header */}
-      <div className={styles.header}>
-        <div className={styles.titleRow}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-            <h1 className={styles.title}>Job Descriptions</h1>
-            <span className={styles.taglineBadge}>
-              <Sparkles size={13} />
-              Day 17: Job Analysis
-            </span>
-          </div>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-indigo-dark)', fontWeight: 600 }}>
-            See your skills. Find your gaps. Build your career.
-          </span>
-        </div>
-        <p className={styles.description}>
-          Add the job descriptions you want to target. Extract and review required skills, preferred qualifications,
-          experience ranges, education, tools, technologies, and certifications.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Target Job Roles"
+        title="Job Descriptions"
+        subtitle="Add target job descriptions to extract required skills, preferred qualifications, experience ranges, education, and tools."
+      />
 
       {/* Global Alerts */}
       {jobsError && (
@@ -740,8 +730,10 @@ export default function JobDescriptions() {
 
       {/* Loading state for list */}
       {isLoadingJobs && jobs.length === 0 && (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 'var(--space-12)' }}>
-          <Spinner size="lg" />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 'var(--space-4)', padding: 'var(--space-6) 0' }}>
+          <SkeletonLoader variant="card" height="180px" />
+          <SkeletonLoader variant="card" height="180px" />
+          <SkeletonLoader variant="card" height="180px" />
         </div>
       )}
 
@@ -815,21 +807,15 @@ export default function JobDescriptions() {
 
       {/* Empty State */}
       {!isLoadingJobs && filteredJobs.length === 0 && (
-        <div className={styles.emptyState}>
-          <div className={styles.emptyIconWrapper}>
-            <Briefcase size={32} />
-          </div>
-          <h3 className={styles.emptyTitle}>
-            {searchQuery || sourceFilter !== 'ALL'
-              ? 'No matching job descriptions'
-              : 'No job descriptions added yet'}
-          </h3>
-          <p className={styles.emptyDescription}>
-            {searchQuery || sourceFilter !== 'ALL'
-              ? 'Try adjusting your search terms or filter settings.'
-              : 'Add your target job descriptions above to begin comparing against your resumes and pinpointing your skill gaps.'}
-          </p>
-        </div>
+        <EmptyState
+          icon={Briefcase}
+          title={searchQuery || sourceFilter !== 'ALL'
+            ? 'No matching job descriptions'
+            : 'No job descriptions added yet'}
+          description={searchQuery || sourceFilter !== 'ALL'
+            ? 'Try adjusting your search terms or filter settings.'
+            : 'Add your target job descriptions above to begin comparing against your resumes and pinpointing your skill gaps.'}
+        />
       )}
 
       {/* Job Details Modal */}

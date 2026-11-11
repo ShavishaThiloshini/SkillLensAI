@@ -3,6 +3,7 @@ import AppLayout from './components/layout/AppLayout'
 import UIShowcase from './components/layout/Showcase'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import Dashboard from './pages/Dashboard'
 import ResumeDashboard from './pages/ResumeDashboard'
 import JobDescriptions from './pages/JobDescriptions'
 import JobAnalysis from './pages/JobAnalysis'
@@ -16,6 +17,8 @@ import CareerInsights from './pages/CareerInsights'
 import ReportGeneration from './pages/ReportGeneration'
 import Settings from './pages/Settings'
 import { ProtectedRoute, PublicOnlyRoute } from './components/common/ProtectedRoute'
+import PageHeader from './components/common/PageHeader'
+import EmptyState from './components/common/EmptyState'
 import { useAuth } from './context/useAuth'
 
 /**
@@ -46,25 +49,16 @@ function PlaceholderPage({ title }) {
   const { user } = useAuth()
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: '40vh',
-      gap: 'var(--space-3)',
-      color: 'var(--color-text-secondary)',
-      textAlign: 'center',
-    }}>
-      <h2 style={{ color: 'var(--color-text-primary)', margin: 0 }}>{title}</h2>
-      {user && (
-        <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-indigo)' }}>
-          Welcome back, {user.full_name}!
-        </p>
-      )}
-      <p style={{ margin: 0, fontSize: 'var(--text-sm)' }}>
-        This page will be implemented in a future development day.
-      </p>
+    <div className="animate-fade-in" style={{ width: '100%', maxWidth: '640px', margin: '0 auto', paddingTop: 'var(--space-6)' }}>
+      <PageHeader
+        eyebrow="Account"
+        title={title}
+        subtitle={user ? `Signed in as ${user.full_name} (${user.email})` : 'User profile settings'}
+      />
+      <EmptyState
+        title={`${title} is coming soon`}
+        description="We're actively polishing and expanding this section. Check back in an upcoming update."
+      />
     </div>
   )
 }
@@ -109,7 +103,7 @@ function App() {
         element={
           <ProtectedRoute>
             <AppLayout>
-              <PlaceholderPage title="Dashboard" />
+              <Dashboard />
             </AppLayout>
           </ProtectedRoute>
         }

@@ -40,6 +40,13 @@
   min-height: 2rem;
 }
 
+@media (max-width: 640px) {
+  .btn--sm {
+    min-height: 2.75rem; /* 44px touch target on mobile viewports */
+    padding: 0.5rem 0.875rem;
+  }
+}
+
 .btn--md {
   font-size: var(--text-sm);
   padding: 0.5625rem 1.125rem;

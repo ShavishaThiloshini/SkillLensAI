@@ -1,0 +1,97 @@
+/* ==========================================================================
+   StatusBadge — CSS Module
+   ========================================================================== */
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  border-radius: var(--radius-full);
+  font-family: var(--font-sans);
+  font-weight: var(--font-semibold);
+  white-space: nowrap;
+  line-height: 1;
+  user-select: none;
+  vertical-align: middle;
+}
+
+/* ── Sizes ── */
+.sm {
+  font-size: var(--text-xs);
+  padding: 2px 8px;
+}
+
+.md {
+  font-size: var(--text-sm);
+  padding: 4px 12px;
+}
+
+/* ── Status colors ── */
+.success {
+  background-color: var(--color-emerald-50);
+  color: var(--color-emerald-dark);
+}
+
+.warning {
+  background-color: var(--color-amber-50);
+  color: #92400E; /* amber-800, darker text for AA contrast */
+}
+
+.danger {
+  background-color: var(--color-red-50);
+  color: var(--color-red-dark);
+}
+
+.info {
+  background-color: var(--color-cyan-50);
+  color: #0E7490; /* cyan-700, darker text for AA contrast */
+}
+
+.neutral {
+  background-color: var(--color-surface-2);
+  color: var(--color-text-secondary);
+}
+
+.processing {
+  background-color: var(--color-indigo-50);
+  color: var(--color-indigo-dark);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .processing {
+    animation: none;
+  }
+}
+
+/* ── Dot indicator ── */
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.success .dot { background-color: var(--color-emerald); }
+.warning .dot { background-color: var(--color-amber); }
+.danger  .dot { background-color: var(--color-red); }
+.info    .dot { background-color: var(--color-cyan); }
+.neutral .dot { background-color: var(--color-text-muted); }
+.processing .dot { background-color: var(--color-indigo); }
+
+/* ── Icon ── */
+.icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}

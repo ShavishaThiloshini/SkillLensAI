@@ -15,7 +15,6 @@ import {
   HelpCircle,
   TrendingUp,
   Award,
-  Layers,
   Wand2,
   Info,
   ArrowRight,
@@ -27,6 +26,10 @@ import {
   Users2,
 } from 'lucide-react'
 import Button from '../components/common/Button'
+import PageHeader from '../components/common/PageHeader'
+import EmptyState from '../components/common/EmptyState'
+import ErrorState from '../components/common/ErrorState'
+import SkeletonLoader from '../components/common/SkeletonLoader'
 import Spinner from '../components/common/Spinner'
 import { getResumes } from '../services/resumeService'
 import { getJobDescriptions } from '../services/jobService'
@@ -177,47 +180,45 @@ export default function CareerInsights() {
   return (
     <div className={styles.page}>
       {/* ── Top Header ── */}
-      <header className={styles.header}>
-        <div>
-          <p className={styles.eyebrow}>Holistic Career Development</p>
-          <h1 className={styles.title}>Career Insights & Readiness Dashboard</h1>
-          <p className={styles.subtitle}>
-            A comprehensive, evidence-grounded assessment of your career readiness, strengths, development areas, priority skills, and actionable career improvement roadmap.
-          </p>
-        </div>
-        <div className={styles.headerActions}>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate(`/analysis-results?resumeId=${selectedResumeId}&jobId=${selectedJobId}`)}
-          >
-            <History size={15} /> Analysis Results
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate(`/roadmap?resumeId=${selectedResumeId}&jobId=${selectedJobId}`)}
-          >
-            <BookOpen size={15} /> Learning Roadmap
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate(`/improvements?resumeId=${selectedResumeId}&jobId=${selectedJobId}`)}
-          >
-            <FileEdit size={15} /> Resume Improvements
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleRegenerate}
-            disabled={generating || !selectedResumeId || !selectedJobId}
-          >
-            {generating ? <Spinner size="sm" /> : <RefreshCw size={15} />}
-            {generating ? 'Re-analyzing…' : 'Re-generate'}
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        eyebrow="Holistic Career Development"
+        title="Career Insights & Readiness Dashboard"
+        subtitle="A comprehensive, evidence-grounded assessment of your career readiness, strengths, development areas, priority skills, and actionable career improvement roadmap."
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/analysis-results?resumeId=${selectedResumeId}&jobId=${selectedJobId}`)}
+            >
+              <History size={15} /> Analysis Results
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/roadmap?resumeId=${selectedResumeId}&jobId=${selectedJobId}`)}
+            >
+              <BookOpen size={15} /> Learning Roadmap
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/improvements?resumeId=${selectedResumeId}&jobId=${selectedJobId}`)}
+            >
+              <FileEdit size={15} /> Resume Improvements
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleRegenerate}
+              disabled={generating || !selectedResumeId || !selectedJobId}
+            >
+              {generating ? <Spinner size="sm" /> : <RefreshCw size={15} />}
+              {generating ? 'Re-analyzing…' : 'Re-generate'}
+            </Button>
+          </>
+        }
+      />
 
       {/* ── Resume & Job Selector ── */}
       <section className={styles.selectorBar} aria-label="Resume and Target Job Selectors">
@@ -258,34 +259,34 @@ export default function CareerInsights() {
 
       {/* ── Loading / Error / Empty States ── */}
       {loading && (
-        <div className={styles.emptyState}>
-          <Spinner size="lg" />
-          <p>Synthesizing career insights across technical skills, projects, and readiness dimensions…</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', padding: 'var(--space-6) 0' }}>
+          <SkeletonLoader variant="paragraph" count={3} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-4)' }}>
+            <SkeletonLoader variant="card" height="160px" />
+            <SkeletonLoader variant="card" height="160px" />
+          </div>
         </div>
       )}
 
       {error && !loading && (
-        <div className={styles.emptyState}>
-          <AlertTriangle size={32} color="var(--color-amber)" />
-          <h2 className={styles.emptyTitle}>Unable to Load Career Insights</h2>
-          <p className={styles.emptyDesc}>{error}</p>
-          <Button variant="outline" size="sm" onClick={fetchInsights}>
-            <RefreshCw size={14} /> Retry
-          </Button>
-        </div>
+        <ErrorState
+          title="Unable to Load Career Insights"
+          message={error}
+          onRetry={fetchInsights}
+        />
       )}
 
       {!loading && !error && !data && (
-        <div className={styles.emptyState}>
-          <Compass size={36} color="var(--color-indigo)" />
-          <h2 className={styles.emptyTitle}>No Career Insights Available Yet</h2>
-          <p className={styles.emptyDesc}>
-            Select a resume and target job above to generate your comprehensive career readiness evaluation.
-          </p>
-          <Button variant="primary" size="sm" onClick={handleRegenerate} disabled={generating}>
-            Generate Career Insights
-          </Button>
-        </div>
+        <EmptyState
+          icon={Compass}
+          title="No Career Insights Available Yet"
+          description="Select a resume and target job above to generate your comprehensive career readiness evaluation."
+          action={
+            <Button variant="primary" size="sm" onClick={handleRegenerate} disabled={generating}>
+              Generate Career Insights
+            </Button>
+          }
+        />
       )}
 
       {/* ── Main Insights Content ── */}

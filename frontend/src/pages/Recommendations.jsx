@@ -22,6 +22,10 @@ import {
   Layers,
 } from 'lucide-react'
 import Button from '../components/common/Button'
+import PageHeader from '../components/common/PageHeader'
+import EmptyState from '../components/common/EmptyState'
+import ErrorState from '../components/common/ErrorState'
+import SkeletonLoader from '../components/common/SkeletonLoader'
 import Spinner from '../components/common/Spinner'
 import { getResumes } from '../services/resumeService'
 import { getJobDescriptions } from '../services/jobService'
@@ -313,45 +317,42 @@ export default function Recommendations() {
   return (
     <main className={styles.page}>
       {/* ── Top Header ── */}
-      <header className={styles.header}>
-        <div>
-          <p className={styles.eyebrow}>Personalized Skill Development</p>
-          <h1 className={styles.title}>Learning Recommendations</h1>
-          <p className={styles.subtitle}>
-            Targeted learning guidance for every missing and partially matched skill, grounded in your target job requirements.
-          </p>
-        </div>
-
-        <div className={styles.headerActions}>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate('/history')}
-          >
-            <History size={15} /> History
-          </Button>
-
-          {selectedResumeId && selectedJobId && (
+      <PageHeader
+        eyebrow="Personalized Skill Development"
+        title="Learning Recommendations"
+        subtitle="Targeted learning guidance for every missing and partially matched skill, grounded in your target job requirements."
+        actions={
+          <>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate(`/roadmap?resumeId=${selectedResumeId}&jobId=${selectedJobId}`)}
+              onClick={() => navigate('/history')}
             >
-              <BookOpen size={15} /> View Roadmap
+              <History size={15} /> History
             </Button>
-          )}
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRegenerate}
-            disabled={generating || !selectedResumeId || !selectedJobId}
-          >
-            {generating ? <Spinner size="sm" /> : <RefreshCw size={15} />}
-            {generating ? 'Re-generating…' : 'Re-calculate Recommendations'}
-          </Button>
-        </div>
-      </header>
+            {selectedResumeId && selectedJobId && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/roadmap?resumeId=${selectedResumeId}&jobId=${selectedJobId}`)}
+              >
+                <BookOpen size={15} /> View Roadmap
+              </Button>
+            )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRegenerate}
+              disabled={generating || !selectedResumeId || !selectedJobId}
+            >
+              {generating ? <Spinner size="sm" /> : <RefreshCw size={15} />}
+              {generating ? 'Re-generating…' : 'Re-calculate Recommendations'}
+            </Button>
+          </>
+        }
+      />
 
       {/* ── Selector Bar ── */}
       <section className={styles.selectorBar} aria-label="Resume and Job Description Selector">
@@ -398,29 +399,29 @@ export default function Recommendations() {
 
       {/* ── Loading & Error States ── */}
       {loading && (
-        <div className={styles.state}>
-          <Spinner size="lg" />
-          <p>Generating personalized learning recommendations…</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', padding: 'var(--space-6) 0' }}>
+          <SkeletonLoader variant="paragraph" count={3} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-4)' }}>
+            <SkeletonLoader variant="card" height="150px" />
+            <SkeletonLoader variant="card" height="150px" />
+          </div>
         </div>
       )}
 
       {error && !loading && (
-        <div className={styles.state}>
-          <AlertTriangle size={36} className={styles.stateIcon} />
-          <h2 className={styles.emptyStateTitle}>Unable to load recommendations</h2>
-          <p className={styles.emptyStateDesc}>{error}</p>
-          <Button onClick={() => loadRecs(selectedResumeId, selectedJobId)}>Try again</Button>
-        </div>
+        <ErrorState
+          title="Unable to load recommendations"
+          message={error}
+          onRetry={() => loadRecs(selectedResumeId, selectedJobId)}
+        />
       )}
 
       {!loading && !error && !recData && (
-        <div className={styles.state}>
-          <Target size={36} className={styles.stateIcon} />
-          <h2 className={styles.emptyStateTitle}>Select a Resume and Job Description</h2>
-          <p className={styles.emptyStateDesc}>
-            Choose a resume and job description above to generate personalized learning guidance.
-          </p>
-        </div>
+        <EmptyState
+          icon={Target}
+          title="Select a Resume and Job Description"
+          description="Choose a resume and job description above to generate personalized learning guidance."
+        />
       )}
 
       {/* ── Main Content ── */}

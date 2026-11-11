@@ -27,6 +27,10 @@ import {
   GraduationCap,
 } from 'lucide-react'
 import Button from '../components/common/Button'
+import PageHeader from '../components/common/PageHeader'
+import EmptyState from '../components/common/EmptyState'
+import ErrorState from '../components/common/ErrorState'
+import SkeletonLoader from '../components/common/SkeletonLoader'
 import Spinner from '../components/common/Spinner'
 import { getResumes } from '../services/resumeService'
 import { getJobDescriptions } from '../services/jobService'
@@ -331,55 +335,52 @@ export default function Roadmap() {
   return (
     <main className={styles.page}>
       {/* ── Top Header ── */}
-      <header className={styles.header}>
-        <div>
-          <p className={styles.eyebrow}>Career Development Plan</p>
-          <h1 className={styles.title}>Skill Gap Roadmap</h1>
-          <p className={styles.subtitle}>
-            Transform your skill gap analysis into an actionable, prioritized learning journey.
-          </p>
-        </div>
-
-        <div className={styles.headerActions}>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate('/history')}
-          >
-            <History size={15} /> History
-          </Button>
-
-          {selectedResumeId && selectedJobId && (
+      <PageHeader
+        eyebrow="Career Development Plan"
+        title="Skill Gap Roadmap"
+        subtitle="Transform your skill gap analysis into an actionable, prioritized learning journey."
+        actions={
+          <>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate(`/recommendations?resumeId=${selectedResumeId}&jobId=${selectedJobId}`)}
+              onClick={() => navigate('/history')}
             >
-              <GraduationCap size={15} /> Recommendations
+              <History size={15} /> History
             </Button>
-          )}
 
-          {overview?.resumeId && overview?.jobId && (
+            {selectedResumeId && selectedJobId && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/recommendations?resumeId=${selectedResumeId}&jobId=${selectedJobId}`)}
+              >
+                <GraduationCap size={15} /> Recommendations
+              </Button>
+            )}
+
+            {overview?.resumeId && overview?.jobId && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/analysis-results?resumeId=${overview.resumeId}&jobId=${overview.jobId}`)}
+              >
+                <ArrowLeft size={15} /> Analysis Results
+              </Button>
+            )}
+
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate(`/analysis-results?resumeId=${overview.resumeId}&jobId=${overview.jobId}`)}
+              onClick={handleRegenerate}
+              disabled={generating || !selectedResumeId || !selectedJobId}
             >
-              <ArrowLeft size={15} /> Analysis Results
+              {generating ? <Spinner size="sm" /> : <RefreshCw size={15} />}
+              {generating ? 'Re-generating…' : 'Re-calculate Roadmap'}
             </Button>
-          )}
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRegenerate}
-            disabled={generating || !selectedResumeId || !selectedJobId}
-          >
-            {generating ? <Spinner size="sm" /> : <RefreshCw size={15} />}
-            {generating ? 'Re-generating…' : 'Re-calculate Roadmap'}
-          </Button>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       {/* ── Selector Bar ── */}
       <section className={styles.selectorBar} aria-label="Resume and Job Selector">
@@ -426,29 +427,29 @@ export default function Roadmap() {
 
       {/* ── Loading & Error States ── */}
       {loading && (
-        <div className={styles.state}>
-          <Spinner size="lg" />
-          <p>Generating personalized learning roadmap…</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', padding: 'var(--space-6) 0' }}>
+          <SkeletonLoader variant="paragraph" count={3} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-4)' }}>
+            <SkeletonLoader variant="card" height="150px" />
+            <SkeletonLoader variant="card" height="150px" />
+          </div>
         </div>
       )}
 
       {error && !loading && (
-        <div className={styles.state}>
-          <AlertTriangle size={36} className={styles.stateIcon} />
-          <h2 className={styles.emptyStateTitle}>Unable to load roadmap</h2>
-          <p className={styles.emptyStateDesc}>{error}</p>
-          <Button onClick={() => loadRoadmap(selectedResumeId, selectedJobId)}>Try again</Button>
-        </div>
+        <ErrorState
+          title="Unable to load roadmap"
+          message={error}
+          onRetry={() => loadRoadmap(selectedResumeId, selectedJobId)}
+        />
       )}
 
       {!loading && !error && !roadmapData && (
-        <div className={styles.state}>
-          <Target size={36} className={styles.stateIcon} />
-          <h2 className={styles.emptyStateTitle}>Select a Resume and Job Description</h2>
-          <p className={styles.emptyStateDesc}>
-            Choose a resume and job description above to generate a tailored skill gap roadmap.
-          </p>
-        </div>
+        <EmptyState
+          icon={Target}
+          title="Select a Resume and Job Description"
+          description="Choose a resume and job description above to generate a tailored skill gap roadmap."
+        />
       )}
 
       {/* ── Content View ── */}

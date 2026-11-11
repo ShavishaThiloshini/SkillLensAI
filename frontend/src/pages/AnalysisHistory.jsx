@@ -17,10 +17,13 @@ import {
   HelpCircle,
   ChevronRight,
   TrendingUp,
-  Layers,
   Sparkles,
 } from 'lucide-react'
 import Button from '../components/common/Button'
+import PageHeader from '../components/common/PageHeader'
+import EmptyState from '../components/common/EmptyState'
+import ErrorState from '../components/common/ErrorState'
+import { SkeletonCard } from '../components/common/SkeletonLoader'
 import Spinner from '../components/common/Spinner'
 import { getAnalysisHistory, deleteAnalysis } from '../services/analysisService'
 import styles from './AnalysisHistory.module.css'
@@ -151,21 +154,16 @@ export default function AnalysisHistory() {
   return (
     <main className={styles.page}>
       {/* ── Page Header ── */}
-      <header className={styles.header}>
-        <div>
-          <p className={styles.eyebrow}>Historical Comparisons</p>
-          <h1 className={styles.title}>Analysis History</h1>
-          <p className={styles.subtitle}>
-            Review, compare, and manage your previous resume-to-job match evaluations.
-          </p>
-        </div>
-
-        <div className={styles.headerActions}>
+      <PageHeader
+        eyebrow="Historical Comparisons"
+        title="Analysis History"
+        subtitle="Review, compare, and manage your previous resume-to-job match evaluations."
+        actions={
           <Button variant="primary" size="sm" onClick={() => navigate('/matching')}>
             <Sparkles size={15} /> Start New Analysis
           </Button>
-        </div>
-      </header>
+        }
+      />
 
       {/* ── Feedback Message Toast ── */}
       {feedback && (
@@ -345,48 +343,48 @@ export default function AnalysisHistory() {
 
       {/* ── Loading State ── */}
       {loading && (
-        <div className={styles.state}>
-          <Spinner size="lg" />
-          <p>Loading your analysis history…</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', padding: 'var(--space-4) 0' }}>
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
         </div>
       )}
 
       {/* ── Error State ── */}
       {error && !loading && (
-        <div className={styles.state}>
-          <AlertTriangle size={36} className={styles.stateIcon} />
-          <h2 className={styles.emptyStateTitle}>Unable to load history</h2>
-          <p className={styles.emptyStateDesc}>{error}</p>
-          <Button onClick={loadHistory}>Try again</Button>
-        </div>
+        <ErrorState
+          title="Unable to load history"
+          message={error}
+          onRetry={loadHistory}
+        />
       )}
 
       {/* ── Initial Empty State (No records at all) ── */}
       {!loading && !error && analyses.length === 0 && !isFiltered && (
-        <div className={styles.state}>
-          <History size={40} className={styles.stateIcon} />
-          <h2 className={styles.emptyStateTitle}>No Previous Analyses</h2>
-          <p className={styles.emptyStateDesc}>
-            Your completed resume-to-job comparisons will appear here. Run your first analysis to discover your skill match and career roadmap.
-          </p>
-          <Button variant="primary" onClick={() => navigate('/matching')}>
-            <Sparkles size={16} /> Compare a Resume & Job
-          </Button>
-        </div>
+        <EmptyState
+          icon={History}
+          title="No Previous Analyses"
+          description="Your completed resume-to-job comparisons will appear here. Run your first analysis to discover your skill match and career roadmap."
+          action={
+            <Button variant="primary" onClick={() => navigate('/matching')}>
+              <Sparkles size={16} /> Compare a Resume & Job
+            </Button>
+          }
+        />
       )}
 
       {/* ── Filter Empty State (Search / Filter returned 0) ── */}
       {!loading && !error && analyses.length === 0 && isFiltered && (
-        <div className={styles.state}>
-          <Search size={36} className={styles.stateIcon} />
-          <h2 className={styles.emptyStateTitle}>No Analyses Found</h2>
-          <p className={styles.emptyStateDesc}>
-            No saved analyses matched your current search and filter settings. Try adjusting your search query or reset the filters.
-          </p>
-          <Button variant="outline" onClick={handleClearFilters}>
-            Clear All Filters
-          </Button>
-        </div>
+        <EmptyState
+          icon={Search}
+          title="No Analyses Found"
+          description="No saved analyses matched your current search and filter settings. Try adjusting your search query or reset the filters."
+          action={
+            <Button variant="outline" onClick={handleClearFilters}>
+              Clear All Filters
+            </Button>
+          }
+        />
       )}
 
       {/* ── Analysis History Cards List ── */}

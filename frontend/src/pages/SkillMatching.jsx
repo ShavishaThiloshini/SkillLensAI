@@ -21,6 +21,9 @@ import {
   Award,
 } from 'lucide-react'
 import Button from '../components/common/Button'
+import PageHeader from '../components/common/PageHeader'
+import EmptyState from '../components/common/EmptyState'
+import ErrorState from '../components/common/ErrorState'
 import Spinner from '../components/common/Spinner'
 import { getResumes } from '../services/resumeService'
 import { getJobDescriptions } from '../services/jobService'
@@ -322,15 +325,12 @@ function SkillMatching() {
   return (
     <div className={styles.page}>
       {/* ── Page Header ── */}
-      <div className={styles.header}>
-        <div className={styles.titleRow}>
-          <h1 className={styles.title}>
-            <span className={styles.titleIcon}>
-              <Sparkles size={22} />
-            </span>
-            Match Score & Skill Analyzer
-          </h1>
-          {scoreData && (
+      <PageHeader
+        eyebrow="Alignment Engine"
+        title="Match Score & Skill Analyzer"
+        subtitle="Calculates explainable, deterministic alignment scores between candidate resume evidence and job requirements across Skills (50%), Experience (25%), and Education (15%)."
+        actions={
+          scoreData && (
             <Button
               variant="outline"
               size="sm"
@@ -340,12 +340,9 @@ function SkillMatching() {
               <RefreshCw size={14} className={isMatching ? 'spin' : ''} />
               Re-calculate Score
             </Button>
-          )}
-        </div>
-        <p className={styles.subtitle}>
-          Calculates explainable, deterministic alignment scores between candidate resume evidence and job requirements across Skills (50%), Experience (25%), and Education (15%).
-        </p>
-      </div>
+          )
+        }
+      />
 
       {/* ── Selection Card ── */}
       <section className={styles.selectionCard} aria-labelledby="selection-title">
@@ -436,19 +433,20 @@ function SkillMatching() {
 
       {/* ── Error State ── */}
       {errorMessage && (
-        <div className={styles.stateContainer} role="alert">
-          <div className={`${styles.stateIcon} ${styles.stateIconRed}`}>
-            <AlertCircle size={32} />
-          </div>
-          <h2 className={styles.stateTitle}>Calculation Failed</h2>
-          <p className={styles.stateMessage}>{errorMessage}</p>
-          <div className={styles.stateActions}>
-            <Button variant="primary" onClick={handleCalculateMatch}>
-              <RefreshCw size={14} />
-              Try Again
-            </Button>
-          </div>
-        </div>
+        <ErrorState
+          title="Calculation Failed"
+          message={errorMessage}
+          onRetry={handleCalculateMatch}
+        />
+      )}
+
+      {/* ── Initial Empty State ── */}
+      {!scoreData && !isMatching && !errorMessage && (
+        <EmptyState
+          icon={Sparkles}
+          title="Ready to Calculate Match"
+          description="Choose a candidate resume and a target job description above, then click 'Calculate Match Score' to generate category scores and evidence alignment."
+        />
       )}
 
       {/* ── Loading State ── */}

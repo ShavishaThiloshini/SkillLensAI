@@ -2431,6 +2431,10 @@ Requirements:
   const { runDay31ReportGenerationTests } = require("./day31ReportGenerationTests");
   await runDay31ReportGenerationTests(testAsync);
 
+  // ---- Day 32: Complete UI/UX Polish Tests ----
+  const { runDay32Tests } = require("./day32UiPolishTests");
+  await runDay32Tests(testAsync);
+
   // Cleanup temp files
   try {
     fs.rmSync(testDir, { recursive: true, force: true });

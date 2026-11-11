@@ -22,6 +22,10 @@ import {
   ExternalLink,
 } from 'lucide-react'
 import Button from '../components/common/Button'
+import PageHeader from '../components/common/PageHeader'
+import EmptyState from '../components/common/EmptyState'
+import ErrorState from '../components/common/ErrorState'
+import SkeletonLoader from '../components/common/SkeletonLoader'
 import Spinner from '../components/common/Spinner'
 import { getResumes } from '../services/resumeService'
 import { getJobDescriptions } from '../services/jobService'
@@ -176,40 +180,38 @@ export default function ResumeImprovements() {
   return (
     <div className={styles.page}>
       {/* ── Top Header ── */}
-      <header className={styles.header}>
-        <div>
-          <p className={styles.eyebrow}>AI-Powered Resume Optimization</p>
-          <h1 className={styles.title}>Resume Improvement Suggestions</h1>
-          <p className={styles.subtitle}>
-            Targeted, truthful recommendations to enhance your professional summary, bullet points, job-relevant keywords, and technical presentation without fabricating qualifications.
-          </p>
-        </div>
-        <div className={styles.headerActions}>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate(`/analysis-results?resumeId=${selectedResumeId}&jobId=${selectedJobId}`)}
-          >
-            <History size={15} /> Analysis Results
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate(`/roadmap?resumeId=${selectedResumeId}&jobId=${selectedJobId}`)}
-          >
-            <BookOpen size={15} /> Skill Gap Roadmap
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleRegenerate}
-            disabled={generating || !selectedResumeId || !selectedJobId}
-          >
-            {generating ? <Spinner size="sm" /> : <RefreshCw size={15} />}
-            {generating ? 'Re-analyzing…' : 'Re-generate'}
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        eyebrow="AI-Powered Resume Optimization"
+        title="Resume Improvement Suggestions"
+        subtitle="Targeted, truthful recommendations to enhance your professional summary, bullet points, job-relevant keywords, and technical presentation without fabricating qualifications."
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/analysis-results?resumeId=${selectedResumeId}&jobId=${selectedJobId}`)}
+            >
+              <History size={15} /> Analysis Results
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/roadmap?resumeId=${selectedResumeId}&jobId=${selectedJobId}`)}
+            >
+              <BookOpen size={15} /> Skill Gap Roadmap
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleRegenerate}
+              disabled={generating || !selectedResumeId || !selectedJobId}
+            >
+              {generating ? <Spinner size="sm" /> : <RefreshCw size={15} />}
+              {generating ? 'Re-analyzing…' : 'Re-generate'}
+            </Button>
+          </>
+        }
+      />
 
       {/* ── Resume & Job Selector ── */}
       <section className={styles.selectorBar} aria-label="Resume and Target Job Selectors">
@@ -261,34 +263,34 @@ export default function ResumeImprovements() {
 
       {/* ── Loading / Error / Empty States ── */}
       {loading && (
-        <div className={styles.emptyState}>
-          <Spinner size="lg" />
-          <p>Analyzing resume and generating improvement recommendations…</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', padding: 'var(--space-6) 0' }}>
+          <SkeletonLoader variant="paragraph" count={3} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-4)' }}>
+            <SkeletonLoader variant="card" height="160px" />
+            <SkeletonLoader variant="card" height="160px" />
+          </div>
         </div>
       )}
 
       {error && !loading && (
-        <div className={styles.emptyState}>
-          <AlertTriangle size={32} color="var(--color-amber)" />
-          <h2 className={styles.emptyTitle}>Unable to Load Improvements</h2>
-          <p className={styles.emptyDesc}>{error}</p>
-          <Button variant="outline" size="sm" onClick={fetchSuggestions}>
-            <RefreshCw size={14} /> Retry
-          </Button>
-        </div>
+        <ErrorState
+          title="Unable to Load Improvements"
+          message={error}
+          onRetry={fetchSuggestions}
+        />
       )}
 
       {!loading && !error && !data && (
-        <div className={styles.emptyState}>
-          <Wand2 size={36} color="var(--color-indigo)" />
-          <h2 className={styles.emptyTitle}>No Improvement Suggestions Available</h2>
-          <p className={styles.emptyDesc}>
-            Select a resume and job description above to produce personalized improvement suggestions.
-          </p>
-          <Button variant="primary" size="sm" onClick={handleRegenerate} disabled={generating}>
-            Generate Suggestions
-          </Button>
-        </div>
+        <EmptyState
+          icon={Wand2}
+          title="No Improvement Suggestions Available"
+          description="Select a resume and job description above to produce personalized improvement suggestions."
+          action={
+            <Button variant="primary" size="sm" onClick={handleRegenerate} disabled={generating}>
+              Generate Suggestions
+            </Button>
+          }
+        />
       )}
 
       {/* ── Main Suggestions Content ── */}

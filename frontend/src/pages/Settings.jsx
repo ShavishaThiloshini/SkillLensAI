@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/useAuth'
 import { testAiConnection, getAiStatus } from '../services/aiService'
+import PageHeader from '../components/common/PageHeader'
 import Spinner from '../components/common/Spinner'
 import styles from './Settings.module.css'
 
@@ -90,12 +91,11 @@ export default function Settings() {
   return (
     <div className={styles.container}>
       {/* ── Page Header ── */}
-      <div className={styles.header}>
-        <h1 className={styles.title}>System Settings & AI Diagnostics</h1>
-        <p className={styles.subtitle}>
-          Manage application preferences and verify server-side AI provider connectivity.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Preferences & Diagnostics"
+        title="System Settings & AI Diagnostics"
+        subtitle="Manage application preferences and verify server-side AI provider connectivity."
+      />
 
       {/* ── Account Summary Card ── */}
       <div className={styles.card}>

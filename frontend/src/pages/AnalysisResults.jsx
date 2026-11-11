@@ -2,6 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, ArrowLeft, BookOpen, Briefcase, CheckCircle2, CircleAlert, Clock3, Compass, FileDown, FileEdit, FileText, GraduationCap, History, Lightbulb, RefreshCw, Sparkles, Target, TrendingUp, XCircle } from 'lucide-react'
 import Button from '../components/common/Button'
+import PageHeader from '../components/common/PageHeader'
+import EmptyState from '../components/common/EmptyState'
+import ErrorState from '../components/common/ErrorState'
+import SkeletonLoader from '../components/common/SkeletonLoader'
 import Spinner from '../components/common/Spinner'
 import { getResumes } from '../services/resumeService'
 import { getJobDescriptions } from '../services/jobService'
@@ -106,15 +110,61 @@ function AnalysisResults() {
   const metadata = scoreData?.metadata || matchData?.matchingMetadata || {}
   const stale = metadata.algorithmVersion && matchData?.matchingMetadata?.algorithmVersion && metadata.algorithmVersion !== matchData.matchingMetadata.algorithmVersion
 
-  if (loading) return <div className={styles.state}><Spinner size="lg" /><p>Loading your saved analysis results…</p></div>
+  if (loading) {
+    return (
+      <main className={styles.page}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', padding: 'var(--space-6) 0' }}>
+          <SkeletonLoader variant="title" width="280px" height="32px" />
+          <SkeletonLoader variant="paragraph" count={3} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
+            <SkeletonLoader variant="card" height="180px" />
+            <SkeletonLoader variant="card" height="180px" />
+            <SkeletonLoader variant="card" height="180px" />
+          </div>
+        </div>
+      </main>
+    )
+  }
 
-  if (!analysisId && (!resumeId || !jobId)) return (
-    <EmptyState icon={Target} title="Choose an analysis or resume and job" message="Analysis Results needs an analysis record or selected resume and target job description." action={() => navigate('/history')} actionLabel="Go to Analysis History" secondary={() => navigate('/matching')} />
-  )
-  if (error) return <EmptyState icon={CircleAlert} title="Results could not be loaded" message={error} action={loadResults} actionLabel="Try again" secondary={() => navigate('/history')} />
-  if (!scoreData && !matchData) return (
-    <EmptyState icon={Sparkles} title="No saved analysis yet" message="Run an analysis for this resume and job description to view a consolidated result." action={rerun} actionLabel="Run analysis" secondary={() => navigate(`/matching?resumeId=${targetResumeId || ''}&jobId=${targetJobId || ''}`)} />
-  )
+  if (!analysisId && (!resumeId || !jobId)) {
+    return (
+      <main className={styles.page}>
+        <EmptyState
+          icon={Target}
+          title="Choose an analysis or resume and job"
+          description="Analysis Results needs an analysis record or selected resume and target job description."
+          action={<Button onClick={() => navigate('/history')}>Go to Analysis History</Button>}
+          secondaryAction={<Button variant="outline" onClick={() => navigate('/matching')}>Open Skill Matching</Button>}
+        />
+      </main>
+    )
+  }
+
+  if (error) {
+    return (
+      <main className={styles.page}>
+        <ErrorState
+          title="Results could not be loaded"
+          message={error}
+          onRetry={loadResults}
+        />
+      </main>
+    )
+  }
+
+  if (!scoreData && !matchData) {
+    return (
+      <main className={styles.page}>
+        <EmptyState
+          icon={Sparkles}
+          title="No saved analysis yet"
+          description="Run an analysis for this resume and job description to view a consolidated result."
+          action={<Button onClick={rerun}>Run analysis</Button>}
+          secondaryAction={<Button variant="outline" onClick={() => navigate(`/matching?resumeId=${targetResumeId || ''}&jobId=${targetJobId || ''}`)}>Open Skill Matching</Button>}
+        />
+      </main>
+    )
+  }
 
   const score = scoreData?.overall?.score
   const analysis = scoreData?.aiAnalysis
@@ -123,40 +173,40 @@ function AnalysisResults() {
   const resumeName = scoreData?.resumeFilename || matchData?.resumeFilename || available.resumes.find((resume) => String(resume.id) === String(targetResumeId))?.original_filename || 'Selected resume'
 
   return <main className={styles.page}>
-    <header className={styles.header}>
-      <div>
-        <p className={styles.eyebrow}>{analysisId ? 'Historical snapshot' : 'Saved comparison'}</p>
-        <h1>Analysis Results</h1>
-        <p className={styles.subtitle}>{jobTitle} · {resumeName} · {formatDate(metadata.calculatedAt || metadata.matchedAt)}</p>
-      </div>
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-        <Button variant="outline" size="sm" onClick={() => navigate('/history')}>
-          <History size={15} /> Back to History
-        </Button>
-        {targetResumeId && targetJobId && (
-          <>
-            <Button variant="primary" size="sm" onClick={() => navigate(`/roadmap?analysisId=${analysisId || ''}&resumeId=${targetResumeId}&jobId=${targetJobId}`)}>
-              <BookOpen size={15} /> View Skill Gap Roadmap
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate(`/recommendations?resumeId=${targetResumeId}&jobId=${targetJobId}`)}>
-              <GraduationCap size={15} /> Learning Recommendations
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate(`/improvements?analysisId=${analysisId || ''}&resumeId=${targetResumeId}&jobId=${targetJobId}`)}>
-              <FileEdit size={15} /> Improve Resume
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate(`/career-insights?analysisId=${analysisId || ''}&resumeId=${targetResumeId}&jobId=${targetJobId}`)}>
-              <Compass size={15} /> Career Insights
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate(analysisId ? `/reports/${analysisId}` : `/reports?resumeId=${targetResumeId}&jobId=${targetJobId}`)}>
-              <FileDown size={15} /> PDF Report
-            </Button>
-          </>
-        )}
-        <Button variant="outline" size="sm" onClick={rerun} disabled={rerunning || !targetResumeId || !targetJobId}>
-          {rerunning ? <Spinner size="sm" /> : <RefreshCw size={15} />} Re-run analysis
-        </Button>
-      </div>
-    </header>
+    <PageHeader
+      eyebrow={analysisId ? 'Historical snapshot' : 'Saved comparison'}
+      title="Analysis Results"
+      subtitle={`${jobTitle} · ${resumeName} · ${formatDate(metadata.calculatedAt || metadata.matchedAt)}`}
+      actions={
+        <>
+          <Button variant="outline" size="sm" onClick={() => navigate('/history')}>
+            <History size={15} /> Back to History
+          </Button>
+          {targetResumeId && targetJobId && (
+            <>
+              <Button variant="primary" size="sm" onClick={() => navigate(`/roadmap?analysisId=${analysisId || ''}&resumeId=${targetResumeId}&jobId=${targetJobId}`)}>
+                <BookOpen size={15} /> View Skill Gap Roadmap
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => navigate(`/recommendations?resumeId=${targetResumeId}&jobId=${targetJobId}`)}>
+                <GraduationCap size={15} /> Learning Recommendations
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => navigate(`/improvements?analysisId=${analysisId || ''}&resumeId=${targetResumeId}&jobId=${targetJobId}`)}>
+                <FileEdit size={15} /> Improve Resume
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => navigate(`/career-insights?analysisId=${analysisId || ''}&resumeId=${targetResumeId}&jobId=${targetJobId}`)}>
+                <Compass size={15} /> Career Insights
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => navigate(analysisId ? `/reports/${analysisId}` : `/reports?resumeId=${targetResumeId}&jobId=${targetJobId}`)}>
+                <FileDown size={15} /> PDF Report
+              </Button>
+            </>
+          )}
+          <Button variant="outline" size="sm" onClick={rerun} disabled={rerunning || !targetResumeId || !targetJobId}>
+            {rerunning ? <Spinner size="sm" /> : <RefreshCw size={15} />} Re-run analysis
+          </Button>
+        </>
+      }
+    />
     {(warnings.length > 0 || stale) && <div className={styles.warning} role="status"><AlertTriangle size={18} /><span>{stale ? 'Some saved results were generated with different analysis versions. Re-run the analysis to refresh them.' : warnings.join(' ')}</span></div>}
 
     <section className={styles.hero} aria-labelledby="overall-match">
@@ -179,5 +229,4 @@ function SkillGroup({ config, entries }) { const Icon = config.icon; return <art
 function AiAnalysis({ analysis }) { return <div className={styles.aiGrid}><article className={`${styles.analysisCard} ${styles.summary}`}><h3><Sparkles size={18}/> Overall summary</h3><p>{analysis.overallSummary}</p></article><ListCard icon={TrendingUp} title="Strongest areas" items={analysis.strongestAreas} render={(item) => <><strong>{item.skill}</strong><p>{item.explanation || item.evidence}</p></>} empty="No strongest areas were included in this analysis."/><ListCard icon={XCircle} title="Biggest skill gaps" items={analysis.biggestSkillGaps} render={(item) => <><strong>{item.skill} <em>{item.requirementType}</em></strong><p>{item.explanation}</p></>} empty="No major skill gaps were included in this analysis."/><AnalysisCard icon={Clock3} title="Experience analysis" text={analysis.experienceAnalysis?.assessment} detail={analysis.experienceAnalysis?.candidateYears !== null && analysis.experienceAnalysis?.candidateYears !== undefined ? `${analysis.experienceAnalysis.candidateYears} candidate years${analysis.experienceAnalysis.requiredYears !== null && analysis.experienceAnalysis.requiredYears !== undefined ? ` · ${analysis.experienceAnalysis.requiredYears} required` : ''}` : null}/><AnalysisCard icon={GraduationCap} title="Education analysis" text={analysis.educationAnalysis?.assessment} detail={analysis.educationAnalysis?.candidateDegree || null}/><ListCard icon={Lightbulb} title="Improvement suggestions" items={analysis.improvementSuggestions} render={(item) => <><strong>{item.area}</strong><p>{item.suggestion}</p></>} empty="No improvement suggestions were included in this analysis."/></div> }
 function ListCard({ icon: Icon, title, items, render, empty }) { return <article className={styles.analysisCard}><h3><Icon size={18}/>{title}</h3>{items?.length ? <ul className={styles.analysisList}>{items.map((item, index) => <li key={index}>{render(item)}</li>)}</ul> : <p className={styles.muted}>{empty}</p>}</article> }
 function AnalysisCard({ icon: Icon, title, text, detail }) { return <article className={styles.analysisCard}><h3><Icon size={18}/>{title}</h3>{detail && <span className={styles.detail}>{detail}</span>}<p>{text || 'No analysis was available.'}</p></article> }
-function EmptyState({ icon: Icon, title, message, action, actionLabel, secondary }) { return <div className={styles.state}><Icon size={34}/><h1>{title}</h1><p>{message}</p><div><Button onClick={action}>{actionLabel}</Button>{secondary && <Button variant="outline" onClick={secondary}>Open Skill Matching</Button>}</div></div> }
 export default AnalysisResults

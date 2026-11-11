@@ -20,6 +20,7 @@ import {
   Info,
 } from 'lucide-react'
 import Button from '../components/common/Button'
+import ErrorState from '../components/common/ErrorState'
 import Spinner from '../components/common/Spinner'
 import {
   getJobDescriptionById,
@@ -291,26 +292,12 @@ export default function JobAnalysis() {
   // ──────────────────────────────────────────────────────────────────────────
   if (jobError || !job) {
     return (
-      <div className={styles.errorScreen}>
-        <div className={styles.errorCard}>
-          <div className={styles.errorIcon}>
-            <AlertCircle size={32} aria-hidden="true" />
-          </div>
-          <h1 className={styles.errorTitle}>Job Description Not Found</h1>
-          <p className={styles.errorMessage}>
-            {jobError || 'The requested job description could not be found or you do not have permission to view it.'}
-          </p>
-          <div className={styles.errorActions}>
-            <Button variant="primary" onClick={() => navigate('/jobs')} id="btn-back-to-jobs-error">
-              <ArrowLeft size={16} />
-              Back to Job Descriptions
-            </Button>
-            <Button variant="outline" onClick={loadJob} id="btn-retry-load">
-              <RefreshCw size={16} />
-              Retry
-            </Button>
-          </div>
-        </div>
+      <div className={styles.page}>
+        <ErrorState
+          title="Job Description Not Found"
+          message={jobError || 'The requested job description could not be found or you do not have permission to view it.'}
+          onRetry={loadJob}
+        />
       </div>
     )
   }
