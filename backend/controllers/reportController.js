@@ -75,8 +75,11 @@ async function downloadReportPdf(req, res) {
   try {
     const { buffer, filename } = await ReportGenerationService.generatePdfReport(analysisId, userId);
 
+    // Sanitize filename to prevent header injection or directory traversal
+    const safeFilename = String(filename || "SkillLens_AI_Report.pdf").replace(/[^a-zA-Z0-9._-]/g, "_");
+
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"`);
     res.setHeader("Content-Length", buffer.length);
 
     return res.end(buffer);

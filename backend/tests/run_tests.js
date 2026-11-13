@@ -2435,6 +2435,10 @@ Requirements:
   const { runDay32Tests } = require("./day32UiPolishTests");
   await runDay32Tests(testAsync);
 
+  // ---- Day 33: Security & Performance Audit Tests ----
+  const { runDay33SecurityTests } = require("./day33SecurityTests");
+  await runDay33SecurityTests(testAsync);
+
   // Cleanup temp files
   try {
     fs.rmSync(testDir, { recursive: true, force: true });
